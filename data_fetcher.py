@@ -230,15 +230,9 @@ def get_available_symbols(limit: int = 50) -> list:
 
 # ── CoinM (Inverse Perpetual) helpers ────────────────────────────────────────
 
-_COINM_SYMBOLS = [
-    'BTCUSD_PERP', 'ETHUSD_PERP', 'BNBUSD_PERP', 'XRPUSD_PERP',
-    'ADAUSD_PERP', 'SOLUSD_PERP', 'DOTUSD_PERP', 'LINKUSD_PERP',
-    'LTCUSD_PERP', 'BCHUSD_PERP', 'ORDIUSD_PERP',
-]
-
 def get_coinm_symbols() -> list:
-    """Return list of supported CoinM inverse perpetual symbols."""
-    return list(_COINM_SYMBOLS)
+    """Return CoinM symbols derived from the live USDM list (always in sync)."""
+    return [s.replace('USDT', 'USD_PERP') for s in get_available_symbols()]
 
 
 def coinm_contract_size(symbol: str) -> int:

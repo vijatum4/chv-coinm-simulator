@@ -9,10 +9,12 @@ def fetch_price_and_atr(
     symbol: str,
     atr_timeframe: str = "4h",
     atr_period: int = 14,
+    market_type: str = 'usdm',
 ) -> Tuple[Optional[float], Optional[float], Optional[str]]:
     """
     Returns (current_price, atr_value, error_message).
     error_message is None on success.
+    market_type: 'usdm' (default, uses fapi) or 'coinm' (uses dapi).
     """
     try:
         import requests
@@ -20,6 +22,7 @@ def fetch_price_and_atr(
         return None, None, "requests library not installed. Run: pip install requests"
 
     symbol = symbol.upper().replace("/", "").replace("-", "")
+    is_coinm = market_type.lower() == 'coinm'
 
     tf_map = {
         "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
@@ -30,13 +33,20 @@ def fetch_price_and_atr(
 
     # Fetch current price from Binance public API
     try:
-        price_url = f"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}"
-        r = requests.get(price_url, timeout=5)
-        if r.status_code != 200:
-            # Try spot
-            price_url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+        if is_coinm:
+            price_url = f"https://dapi.binance.com/dapi/v1/ticker/price?symbol={symbol}"
             r = requests.get(price_url, timeout=5)
+        else:
+            price_url = f"https://fapi.binance.com/fapi/v1/ticker/price?symbol={symbol}"
+            r = requests.get(price_url, timeout=5)
+            if r.status_code != 200:
+                # Try spot
+                price_url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+                r = requests.get(price_url, timeout=5)
         data = r.json()
+        # dapi returns a list when no symbol given, single dict for specific symbol
+        if isinstance(data, list):
+            data = data[0] if data else {}
         if "price" not in data:
             return None, None, f"Symbol {symbol} not found on Binance: {data.get('msg', 'unknown error')}"
         current_price = float(data["price"])
@@ -45,17 +55,24 @@ def fetch_price_and_atr(
 
     # Fetch OHLCV for ATR calculation
     try:
-        klines_url = (
-            f"https://fapi.binance.com/fapi/v1/klines"
-            f"?symbol={symbol}&interval={interval}&limit={atr_period + 5}"
-        )
-        r = requests.get(klines_url, timeout=5)
-        if r.status_code != 200:
+        if is_coinm:
             klines_url = (
-                f"https://api.binance.com/api/v3/klines"
+                f"https://dapi.binance.com/dapi/v1/klines"
                 f"?symbol={symbol}&interval={interval}&limit={atr_period + 5}"
             )
             r = requests.get(klines_url, timeout=5)
+        else:
+            klines_url = (
+                f"https://fapi.binance.com/fapi/v1/klines"
+                f"?symbol={symbol}&interval={interval}&limit={atr_period + 5}"
+            )
+            r = requests.get(klines_url, timeout=5)
+            if r.status_code != 200:
+                klines_url = (
+                    f"https://api.binance.com/api/v3/klines"
+                    f"?symbol={symbol}&interval={interval}&limit={atr_period + 5}"
+                )
+                r = requests.get(klines_url, timeout=5)
         klines = r.json()
         if not isinstance(klines, list) or len(klines) < 2:
             return current_price, None, "Could not fetch enough candles for ATR calculation."

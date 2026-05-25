@@ -502,6 +502,58 @@ svg.chart{width:100%;display:block}
   .params{grid-template-columns:repeat(3,1fr)}
 }
 
+/* ── Market type tabs ───────────────────────────────────── */
+.market-tabs{
+  display:flex;gap:4px;margin-bottom:14px;
+  background:var(--olive-800);border-radius:10px;padding:3px;
+  border:1px solid var(--line);
+}
+.mt-tab{
+  flex:1;border:0;cursor:pointer;
+  font-family:'Inter Tight',sans-serif;font-weight:700;
+  font-size:11.5px;padding:6px 10px;border-radius:8px;
+  background:transparent;color:var(--muted);
+  transition:background 0.15s,color 0.15s;letter-spacing:0.02em;
+}
+.mt-tab.active{background:var(--green);color:var(--olive-800)}
+.mt-tab:hover:not(.active){color:var(--beige-dim);background:rgba(236,239,206,0.05)}
+
+/* ── Slider rows ────────────────────────────────────────── */
+.sf-slider-row{margin-bottom:10px}
+.sf-slider-head{
+  display:flex;align-items:center;
+  justify-content:space-between;margin-bottom:6px;
+}
+.sf-slider-lbl{font-size:11px;color:var(--beige-dim);font-weight:500}
+.sf-slider-badge{
+  font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;
+  color:var(--green);background:rgba(181,224,0,0.10);
+  border:1px solid rgba(181,224,0,0.2);
+  padding:2px 8px;border-radius:6px;min-width:40px;text-align:center;
+}
+input[type=range].sf-range{
+  -webkit-appearance:none;appearance:none;
+  width:100%;height:4px;border-radius:99px;
+  background:var(--olive-600);outline:none;cursor:pointer;
+  display:block;
+}
+input[type=range].sf-range::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:16px;height:16px;border-radius:50%;
+  background:var(--green);cursor:pointer;
+  transition:background 0.15s,transform 0.1s;
+}
+input[type=range].sf-range::-webkit-slider-thumb:hover{
+  background:var(--green-soft);transform:scale(1.15);
+}
+input[type=range].sf-range::-moz-range-thumb{
+  width:16px;height:16px;border-radius:50%;
+  background:var(--green);cursor:pointer;border:0;
+}
+input[type=range].sf-range::-moz-range-track{
+  background:var(--olive-600);height:4px;border-radius:99px;
+}
+
 {% block extra_css %}{% endblock %}
 </style>
 </head>
@@ -554,15 +606,32 @@ svg.chart{width:100%;display:block}
     <!-- Sidebar form — shared params -->
     <form method="POST" action="{{ request.path }}" id="sidebarForm" style="flex:1;padding-bottom:20px">
 
+      <!-- Market type tabs -->
+      <div class="sb-section" style="padding-top:14px;padding-bottom:0">
+        <input type="hidden" name="market_type" id="marketTypeInput" value="{{ market_type }}">
+        <div class="market-tabs">
+          <button type="button" class="mt-tab {% if market_type=='COINM' %}{% else %}active{% endif %}"
+                  data-val="USDM" onclick="setMarket('USDM')">USDM-M</button>
+          <button type="button" class="mt-tab {% if market_type=='COINM' %}active{% endif %}"
+                  data-val="COINM" onclick="setMarket('COINM')">COIN-M</button>
+        </div>
+      </div>
+
       <div class="sb-section">
         <span class="sb-label">Asset</span>
 
         <div class="sf-row">
           <label class="sf-field-label">Symbol</label>
-          <select class="sf-input" name="symbol" onchange="autoFetchSymbol(this)">
-            {% for sym in ['SOLUSDT','BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','FARTCOINUSDT','SUIUSDT','DOGEUSDT','AVAXUSDT','NEARUSDT','ONDOUSDT','JUPUSDT','JTOUSDT','XAUUSDT'] %}
-            <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
-            {% endfor %}
+          <select class="sf-input" id="symbolSelect" name="symbol" onchange="autoFetchSymbol(this)">
+            {% if market_type == 'COINM' %}
+              {% for sym in coinm_symbols %}
+              <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
+              {% endfor %}
+            {% else %}
+              {% for sym in ['SOLUSDT','BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','FARTCOINUSDT','SUIUSDT','DOGEUSDT','AVAXUSDT','NEARUSDT','ONDOUSDT','JUPUSDT','JTOUSDT','XAUUSDT'] %}
+              <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
+              {% endfor %}
+            {% endif %}
           </select>
         </div>
 
@@ -583,9 +652,14 @@ svg.chart{width:100%;display:block}
           <div style="font-size:10.5px;color:var(--muted);margin-top:3px">Auto-set from Trading TF</div>
         </div>
 
-        <div class="sf-row">
-          <label class="sf-field-label">ATR Period</label>
-          <input class="sf-input mono" type="number" name="atr_period" value="{{ atr_period }}" min="2" max="50">
+        <div class="sf-slider-row">
+          <div class="sf-slider-head">
+            <label class="sf-slider-lbl" for="atrPeriodRange">ATR Period</label>
+            <span class="sf-slider-badge" id="atrPeriodBadge">{{ atr_period }}</span>
+          </div>
+          <input class="sf-range" type="range" id="atrPeriodRange" name="atr_period"
+                 min="2" max="30" step="1" value="{{ atr_period }}"
+                 oninput="document.getElementById('atrPeriodBadge').textContent=this.value">
         </div>
 
         <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -611,18 +685,24 @@ svg.chart{width:100%;display:block}
       <div class="sb-section">
         <span class="sb-label">Strategy</span>
 
-        <div class="sf-row">
-          <label class="sf-field-label">Efficiency Buffer</label>
-          <select class="sf-input mono" name="efficiency_buffer">
-            {% for b in buffer_choices %}
-            <option value="{{ b }}" {% if b|string == efficiency_buffer|string or b == efficiency_buffer %}selected{% endif %}>{{ b }}</option>
-            {% endfor %}
-          </select>
+        <div class="sf-slider-row">
+          <div class="sf-slider-head">
+            <label class="sf-slider-lbl" for="bufferRange">Efficiency Buffer</label>
+            <span class="sf-slider-badge" id="bufferBadge">{{ efficiency_buffer }}</span>
+          </div>
+          <input class="sf-range" type="range" id="bufferRange" name="efficiency_buffer"
+                 min="0.65" max="0.95" step="0.05" value="{{ efficiency_buffer }}"
+                 oninput="document.getElementById('bufferBadge').textContent=parseFloat(this.value).toFixed(2)">
         </div>
 
-        <div class="sf-row">
-          <label class="sf-field-label">Reward Ratio</label>
-          <input class="sf-input mono" type="number" name="reward_ratio" value="{{ reward_ratio }}" step="0.1" min="2" max="5">
+        <div class="sf-slider-row">
+          <div class="sf-slider-head">
+            <label class="sf-slider-lbl" for="rewardRatioRange">Reward Ratio</label>
+            <span class="sf-slider-badge" id="rewardRatioBadge">{{ reward_ratio }}</span>
+          </div>
+          <input class="sf-range" type="range" id="rewardRatioRange" name="reward_ratio"
+                 min="2.0" max="4.0" step="0.1" value="{{ reward_ratio }}"
+                 oninput="document.getElementById('rewardRatioBadge').textContent=parseFloat(this.value).toFixed(1)">
         </div>
       </div>
 
@@ -635,15 +715,19 @@ svg.chart{width:100%;display:block}
                  step="{{ lot_step }}" min="{{ lot_min }}">
         </div>
 
-        <div class="sf-row-2">
-          <div>
-            <label class="sf-field-label">Leverage</label>
-            <input class="sf-input mono" type="number" name="leverage" value="{{ leverage }}" min="1" max="125">
+        <div class="sf-slider-row">
+          <div class="sf-slider-head">
+            <label class="sf-slider-lbl" for="leverageRange">Leverage</label>
+            <span class="sf-slider-badge" id="leverageBadge">{{ leverage }}×</span>
           </div>
-          <div>
-            <label class="sf-field-label">Capital (USD)</label>
-            <input class="sf-input mono" type="number" name="capital" value="{{ capital }}" min="1" step="any">
-          </div>
+          <input class="sf-range" type="range" id="leverageRange" name="leverage"
+                 min="1" max="125" step="1" value="{{ leverage }}"
+                 oninput="document.getElementById('leverageBadge').textContent=this.value+'×'">
+        </div>
+
+        <div class="sf-row">
+          <label class="sf-field-label">Capital (USD)</label>
+          <input class="sf-input mono" type="number" name="capital" value="{{ capital }}" min="1" step="any">
         </div>
 
         <div class="sf-row">
@@ -682,10 +766,14 @@ svg.chart{width:100%;display:block}
           <span class="sf-toggle-lbl">ATR Guard</span>
         </label>
         <div id="atrGuardSection" {% if not atr_guard_on %}style="display:none"{% endif %}>
-          <div class="sf-row">
-            <label class="sf-field-label">Guard Multiplier</label>
-            <input class="sf-input mono" type="number" name="atr_guard_multiplier"
-                   value="{{ atr_guard_multiplier }}" step="0.1" min="0.5" max="3">
+          <div class="sf-slider-row">
+            <div class="sf-slider-head">
+              <label class="sf-slider-lbl" for="atrGuardMulRange">Guard Multiplier</label>
+              <span class="sf-slider-badge" id="atrGuardMulBadge">{{ atr_guard_multiplier }}×</span>
+            </div>
+            <input class="sf-range" type="range" id="atrGuardMulRange" name="atr_guard_multiplier"
+                   min="1.0" max="3.0" step="0.5" value="{{ atr_guard_multiplier }}"
+                   oninput="document.getElementById('atrGuardMulBadge').textContent=parseFloat(this.value).toFixed(1)+'×'">
           </div>
         </div>
       </div>
@@ -708,6 +796,32 @@ svg.chart{width:100%;display:block}
 // TF auto-update mapping
 const TF_RULE = {{ tf_rule | tojson }};
 
+// USDM / COINM symbol lists (for client-side tab switching)
+const MARKET_SYMBOLS = {
+  'USDM': ['SOLUSDT','BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','FARTCOINUSDT',
+           'SUIUSDT','DOGEUSDT','AVAXUSDT','NEARUSDT','ONDOUSDT','JUPUSDT','JTOUSDT','XAUUSDT'],
+  'COINM': {{ coinm_symbols | tojson }},
+};
+
+function setMarket(val) {
+  const inp = document.getElementById('marketTypeInput');
+  if (inp) inp.value = val;
+  document.querySelectorAll('.mt-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.val === val)
+  );
+  // Swap symbol options
+  const sel = document.getElementById('symbolSelect');
+  if (!sel) return;
+  const current = sel.value;
+  const syms = MARKET_SYMBOLS[val] || MARKET_SYMBOLS['USDM'];
+  sel.innerHTML = syms.map(s =>
+    `<option value="${s}"${s === current ? ' selected' : ''}>${s}</option>`
+  ).join('');
+  // Re-fetch price if one was already loaded
+  const priceEl = document.getElementById('priceInput');
+  if (priceEl && priceEl.value) fetchPriceAtr();
+}
+
 function updateAtrTf(sel) {
   const atrTf = TF_RULE[sel.value] || '4h';
   const hidden = document.getElementById('atrTfHidden');
@@ -722,13 +836,15 @@ function toggleSection(id, checkbox) {
 }
 
 function fetchPriceAtr() {
-  const sym = document.querySelector('[name=symbol]').value;
+  const sym = document.getElementById('symbolSelect')?.value
+           || document.querySelector('[name=symbol]')?.value || 'SOLUSDT';
   const atrTf = document.getElementById('atrTfHidden').value;
   const period = document.querySelector('[name=atr_period]').value;
+  const marketType = (document.getElementById('marketTypeInput')?.value || 'USDM').toLowerCase();
   const statusEl = document.getElementById('fetchStatus');
   statusEl.textContent = 'Fetching…';
   statusEl.style.color = 'var(--gold)';
-  fetch(`/sim/api/price-atr?symbol=${sym}&atr_tf=${atrTf}&atr_period=${period}`)
+  fetch(`/sim/api/price-atr?symbol=${sym}&atr_tf=${atrTf}&atr_period=${period}&market_type=${marketType}`)
     .then(r => r.json())
     .then(data => {
       if (data.ok) {
@@ -741,7 +857,7 @@ function fetchPriceAtr() {
         statusEl.style.color = 'var(--neg)';
       }
     })
-    .catch(e => {
+    .catch(() => {
       statusEl.textContent = '✗ Network error';
       statusEl.style.color = 'var(--neg)';
     });

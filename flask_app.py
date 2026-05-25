@@ -15,7 +15,8 @@ sys.path.insert(0, str(SIM_DIR))
 from chv_engine import calculate_params, simulate, optimize, generate_bot_config, CHVParams, SimResult
 from backtest_engine import run_backtest
 from data_fetcher import (fetch_historical_ohlcv, klines_to_candles,
-                          fetch_price_and_atr, get_available_symbols)
+                          fetch_price_and_atr, get_available_symbols,
+                          get_coinm_symbols)
 
 app = Flask(__name__, template_folder=str(SIM_DIR / 'templates'),
             static_folder=str(SIM_DIR / 'static'))
@@ -67,6 +68,20 @@ LOT_SPECS = {
 }
 MAX_STEPS = 50  # matches Streamlit
 
+# CoinM lot specs (lots = contracts; BTC=$100/contract, others=$10/contract)
+COINM_LOT_SPECS = {
+    'BTCUSD_PERP': (1, 1, 0),
+    'ETHUSD_PERP': (1, 1, 0),
+    'BNBUSD_PERP': (1, 1, 0),
+    'XRPUSD_PERP': (1, 1, 0),
+    'ADAUSD_PERP': (1, 1, 0),
+    'SOLUSD_PERP': (1, 1, 0),
+    'DOTUSD_PERP': (1, 1, 0),
+    'LINKUSD_PERP': (1, 1, 0),
+    'LTCUSD_PERP': (1, 1, 0),
+    'BCHUSD_PERP': (1, 1, 0),
+}
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _sidebar_defaults():
@@ -92,6 +107,7 @@ def _sidebar_defaults():
         use_live=True,
         base_asset='SOL',
         settle_coin='USDT',
+        market_type='USDM',
     )
 
 
@@ -99,10 +115,17 @@ def _parse_sidebar(form, sess):
     d = _sidebar_defaults()
     src = {**sess, **form}
 
+    # Market type (USDM or COINM)
+    d['market_type'] = form.get('market_type', src.get('market_type', 'USDM'))
+
     sym = src.get('symbol', d['symbol'])
     d['symbol'] = sym
-    d['base_asset'] = sym.replace('USDT', '').replace('BUSD', '')
-    d['settle_coin'] = 'USDT'
+    if '_PERP' in sym:
+        d['base_asset'] = sym.split('USD')[0]
+        d['settle_coin'] = 'USD'
+    else:
+        d['base_asset'] = sym.replace('USDT', '').replace('BUSD', '')
+        d['settle_coin'] = 'USDT'
 
     for key in ('trading_tf', 'atr_tf'):
         if src.get(key):
@@ -137,7 +160,10 @@ def _parse_sidebar(form, sess):
         d['slip_pct'] = 0.0005  # default to liquid pairs
 
     # Lot spec for display
-    min_qty, step, dec = LOT_SPECS.get(sym, (0.001, 0.001, 3))
+    if d.get('market_type') == 'COINM':
+        min_qty, step, dec = COINM_LOT_SPECS.get(sym, (1, 1, 0))
+    else:
+        min_qty, step, dec = LOT_SPECS.get(sym, (0.001, 0.001, 3))
     d['lot_min'] = min_qty
     d['lot_step'] = step
     d['lot_dec'] = dec
@@ -387,10 +413,13 @@ def _bt_worker(job_id: str):
         atr_interval = d['atr_tf']
         bt_days = d.get('bt_days', 365)
 
+        mkt = d.get('market_type', 'USDM').lower()
+
         upd(5, f'Fetching {trade_interval} candles…')
         trading_klines, err1 = fetch_historical_ohlcv(
             d['symbol'], trade_interval, days=bt_days,
-            progress_callback=lambda p: upd(int(5 + p * 35), f'Fetching {trade_interval} candles…')
+            progress_callback=lambda p: upd(int(5 + p * 35), f'Fetching {trade_interval} candles…'),
+            market_type=mkt,
         )
         if err1:
             raise RuntimeError(f'Trading candles: {err1}')
@@ -398,7 +427,8 @@ def _bt_worker(job_id: str):
         upd(40, f'Fetching {atr_interval} ATR candles…')
         atr_klines, err2 = fetch_historical_ohlcv(
             d['symbol'], atr_interval, days=bt_days,
-            progress_callback=lambda p: upd(int(40 + p * 35), f'Fetching {atr_interval} candles…')
+            progress_callback=lambda p: upd(int(40 + p * 35), f'Fetching {atr_interval} candles…'),
+            market_type=mkt,
         )
         if err2:
             raise RuntimeError(f'ATR candles: {err2}')
@@ -449,6 +479,7 @@ def _ctx(d, mode):
         tf_choices=TF_CHOICES,
         tf_rule=TF_RULE,
         lot_specs=LOT_SPECS,
+        coinm_symbols=get_coinm_symbols(),
     )
 
 
@@ -783,8 +814,9 @@ def api_price_atr():
     sym = request.args.get('symbol', 'SOLUSDT')
     atr_tf = request.args.get('atr_tf', '4h')
     period = int(request.args.get('atr_period', 5))
+    market_type = request.args.get('market_type', 'usdm').lower()
     try:
-        price, atr, err = fetch_price_and_atr(sym, atr_tf, period)
+        price, atr, err = fetch_price_and_atr(sym, atr_tf, period, market_type)
         if err:
             return jsonify({'ok': False, 'error': err})
         return jsonify({'ok': True, 'price': price, 'atr': atr})

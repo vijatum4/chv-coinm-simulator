@@ -84,6 +84,7 @@ def fetch_historical_ohlcv(
     interval: str,
     days: int = 730,
     progress_callback=None,
+    market_type: str = 'usdm',
 ) -> Tuple[List, Optional[str]]:
     """
     Fetch historical OHLCV candles from Binance (futures then spot fallback).
@@ -113,11 +114,14 @@ def fetch_historical_ohlcv(
     batch_size = 1500
     current_start = start_ms
 
-    # Try futures first, fall back to spot
-    base_urls = [
-        f"https://fapi.binance.com/fapi/v1/klines",
-        f"https://api.binance.com/api/v3/klines",
-    ]
+    # Select endpoint based on market type
+    if market_type == 'coinm':
+        base_urls = ["https://dapi.binance.com/dapi/v1/klines"]
+    else:
+        base_urls = [
+            "https://fapi.binance.com/fapi/v1/klines",
+            "https://api.binance.com/api/v3/klines",
+        ]
     working_url = None
     for url in base_urls:
         try:

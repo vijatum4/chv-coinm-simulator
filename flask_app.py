@@ -233,9 +233,9 @@ def _prep_bt_log(result, capital: float, trading_tf: str, settle_coin: str = 'US
         dur_c  = max(1, round(dur_ms / tf_ms))
         s_dt = datetime.datetime.utcfromtimestamp(c.start_ts/1000).strftime('%Y-%m-%d %H:%M') if c.start_ts else '—'
         e_dt = datetime.datetime.utcfromtimestamp(c.end_ts/1000).strftime('%Y-%m-%d %H:%M')   if c.end_ts   else '—'
-        liq     = not c.capital_ok
-        stopped = hasattr(c,'exit_direction') and c.exit_direction=='STOPPED'
-        exit_str= '💀 LIQ' if liq else ('⛔ STOP' if stopped else getattr(c,'exit_direction','—'))
+        liq      = not c.capital_ok
+        aborted  = c.exit_direction == 'ABORTED'
+        exit_str = '💀 LIQ' if liq else ('⛔ ABORTED' if aborted else c.exit_direction)
         rows.append({
             'num':      c.cycle_num,
             'capital':  fmt_cap(cap),
@@ -288,14 +288,10 @@ def simulator():
         try:
             p = calculate_params(d['symbol'], d['price_val'], d['atr_val'],
                                  d['efficiency_buffer'], d['reward_ratio'])
-            result = simulate(CHVParams(
-                symbol=d['symbol'], price=d['price_val'], atr=d['atr_val'],
-                c=p.c, d_val=p.d, lp=p.lp, sp=p.sp, tl=p.tl, ts=p.ts,
+            result = simulate(p,
                 base_lots=d['base_lots'], leverage=d['leverage'],
                 capital=d['capital'], fee_rate=d['fee_rate_pct']/100,
-                slippage=d['slip_pct']/100,
-                max_whipsaws=d['ws_limit'] if d['ws_limit_on'] else 0,
-            ))
+            )
         except Exception as ex: error = str(ex)
     return render_template('simulator/simulator.html', mode='simulator',
                            result=result, error=error, **d,
@@ -338,13 +334,15 @@ def _bt_worker(job_id: str):
     try:
         upd(5, 'Fetching candles…')
         mt = d.get('market_type','usdm')
-        klines = fetch_historical_ohlcv(
+        klines, kl_err = fetch_historical_ohlcv(
             d['symbol'], d['atr_tf'], days=d['bt_days'],
             market_type=mt)
+        if kl_err: raise RuntimeError(kl_err)
         atr_candles = klines_to_candles(klines)
         if d['trading_tf'] != d['atr_tf']:
-            klines2 = fetch_historical_ohlcv(d['symbol'], d['trading_tf'],
+            klines2, kl_err2 = fetch_historical_ohlcv(d['symbol'], d['trading_tf'],
                                              days=d['bt_days'], market_type=mt)
+            if kl_err2: raise RuntimeError(kl_err2)
             trading_candles = klines_to_candles(klines2)
         else:
             trading_candles = atr_candles
@@ -353,14 +351,13 @@ def _bt_worker(job_id: str):
         result = run_backtest(
             symbol=d['symbol'], trading_candles=trading_candles,
             atr_candles=atr_candles, atr_period=int(d['atr_period']),
-            efficiency_buffer=d['efficiency_buffer'],
+            buffer=d['efficiency_buffer'],
             reward_ratio=d['reward_ratio'],
             base_lots=d['base_lots'], leverage=int(d['leverage']),
             capital=bt_capital, fee_rate=d['fee_rate_pct']/100,
-            slippage=d.get('slip_pct',0)/100,
+            slippage_pct=d.get('slip_pct',0)/100,
             max_whipsaws=d['ws_limit'] if d['ws_limit_on'] else 0,
-            market_type=mt,
-            atr_guard_on=d.get('atr_guard_on',False),
+            atr_guard=d.get('atr_guard_on',False),
             atr_guard_multiplier=d.get('atr_guard_multiplier',2.0),
         )
         upd(90, 'Saving…')

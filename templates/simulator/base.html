@@ -726,8 +726,8 @@ input[type=range].sf-range::-moz-range-track{
         </div>
 
         <div class="sf-row">
-          <label class="sf-field-label">Capital (USD)</label>
-          <input class="sf-input mono" type="number" name="capital" value="{{ capital }}" min="1" step="any">
+          <label class="sf-field-label" id="capitalLabel">Capital ({{ base_asset if market_type == 'COINM' else 'USD' }})</label>
+          <input class="sf-input mono" id="capitalInput" type="number" name="capital" value="{{ capital }}" min="0.001" step="any">
         </div>
 
         <div class="sf-row">
@@ -804,6 +804,17 @@ const MARKET_SYMBOLS = {
   'COINM': {{ coinm_symbols | tojson }},
 };
 
+function coinmBase(symbol) {
+  return symbol.replace('USD_PERP', '');
+}
+
+function updateCapitalLabel(marketVal, symbolVal) {
+  const lbl = document.getElementById('capitalLabel');
+  if (!lbl) return;
+  const unit = marketVal === 'COINM' ? coinmBase(symbolVal || '') : 'USD';
+  lbl.textContent = `Capital (${unit})`;
+}
+
 function setMarket(val) {
   const inp = document.getElementById('marketTypeInput');
   if (inp) inp.value = val;
@@ -818,6 +829,12 @@ function setMarket(val) {
   sel.innerHTML = syms.map(s =>
     `<option value="${s}"${s === current ? ' selected' : ''}>${s}</option>`
   ).join('');
+  const newSym = document.getElementById('symbolSelect').value;
+  // Reset capital to mode default
+  const capInp = document.getElementById('capitalInput');
+  if (capInp) capInp.value = val === 'COINM' ? 1 : 1000;
+  // Update capital label
+  updateCapitalLabel(val, newSym);
   // Re-fetch price if one was already loaded
   const priceEl = document.getElementById('priceInput');
   if (priceEl && priceEl.value) fetchPriceAtr();
@@ -865,6 +882,9 @@ function fetchPriceAtr() {
 }
 
 function autoFetchSymbol(sel) {
+  // Update capital label when symbol changes (relevant in COINM mode)
+  const mkt = document.getElementById('marketTypeInput')?.value || 'USDM';
+  updateCapitalLabel(mkt, sel.value);
   // auto-fetch when symbol changes if price already loaded
   const priceEl = document.getElementById('priceInput');
   if (priceEl && priceEl.value) fetchPriceAtr();
@@ -893,11 +913,12 @@ function toggleParams() {
 // Cycle log filter
 function filterLog() {
   const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
-  const exit = (document.getElementById('exitFilter')?.value || '').toLowerCase();
+  const exit = document.getElementById('exitFilter')?.value || '';  // keep case — exact match
   document.querySelectorAll('#logBody tr[data-exit]').forEach(tr => {
     const text = tr.textContent.toLowerCase();
-    const exitVal = (tr.dataset.exit || '').toLowerCase();
-    tr.style.display = (!q || text.includes(q)) && (!exit || exitVal.includes(exit)) ? '' : 'none';
+    const exitVal = tr.dataset.exit || '';
+    const exitMatch = !exit || exitVal === exit;
+    tr.style.display = (!q || text.includes(q)) && exitMatch ? '' : 'none';
   });
 }
 

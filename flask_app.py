@@ -150,6 +150,10 @@ def _parse_sidebar(form, sess):
         except (KeyError, TypeError, ValueError):
             pass
 
+    # Apply mode-appropriate capital default when no explicit value was submitted
+    if 'capital' not in form and 'capital' not in sess:
+        d['capital'] = 1.0 if d['market_type'] == 'COINM' else 1000.0
+
     for key in ('ws_limit_on', 'atr_guard_on', 'use_live'):
         val = src.get(key, '')
         d[key] = bool(val and val not in ('', 'off', 'false', '0', False))
@@ -301,11 +305,13 @@ def _build_bt_charts(result, capital: float, cur_sym: str = '$') -> dict:
     )
 
 
+# Keys match backtest_engine exit_direction values exactly
 _EXIT_DISPLAY = {
-    'LONG_TP':  'Exit Long',
-    'SHORT_TP': 'Exit Short',
-    'LIQ':      'Liquidated',
-    'ABORTED':  'Aborted',
+    'EXIT_LONG':  'Exit Long',
+    'EXIT_SHORT': 'Exit Short',
+    'STOPPED':    'Stopped',
+    'ABORTED':    'Aborted',
+    'LIQ':        'Liquidated',
 }
 
 def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$') -> list:
@@ -596,7 +602,9 @@ def bt_result_view(job_id):
 
     total_trades = sum(len(c.steps) for c in result.cycles)
     growth_pct = (result.total_net_pnl / bt_cap * 100) if bt_cap else 0
-    top6_ws = sorted([c.whipsaws for c in result.cycles], reverse=True)[:6]
+    # Deduplicated top whipsaw values, sorted descending (for display badges)
+    all_ws_sorted = sorted([c.whipsaws for c in result.cycles], reverse=True)
+    top6_ws = list(dict.fromkeys(all_ws_sorted))[:7]  # up to 7 unique values
     ws_breakdown = _build_ws_breakdown(result)
 
     # capital at worst_intra_loss_cycle

@@ -72,10 +72,17 @@
   <div class="card card-sm" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;gap:3px">
       <label class="sf-field-label">Lookback</label>
-      <select class="sf-input" name="bt_days" style="width:120px">
-        {% for d in [90,180,365,730] %}
-        <option value="{{ d }}" {% if d == bt_days %}selected{% endif %}>{{ d }}d</option>
-        {% endfor %}
+      <select class="sf-input" name="bt_days" style="width:136px">
+        <optgroup label="Short (1–30d)">
+          {% for d in range(1, 31) %}
+          <option value="{{ d }}" {% if d == bt_days %}selected{% endif %}>{{ d }}d</option>
+          {% endfor %}
+        </optgroup>
+        <optgroup label="Extended">
+          {% for d in [45, 60, 90, 180, 365, 730] %}
+          <option value="{{ d }}" {% if d == bt_days %}selected{% endif %}>{{ d }}d</option>
+          {% endfor %}
+        </optgroup>
       </select>
     </div>
     <button type="submit" class="btn btn-green" style="align-self:flex-end">▶ Run Backtest</button>
@@ -192,15 +199,19 @@
   </div>
 
   <div class="stat">
-    <div class="stat-lbl">Top Max Whipsaws</div>
+    <div class="stat-lbl">Max Whipsaws</div>
     <div class="stat-val mono">{{ top6[0] if top6 else 0 }}</div>
-    <div style="align-self:end;display:flex;flex-wrap:wrap;gap:3px">
-      {% for w in top6 %}
-      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;
-                   background:var(--line);color:var(--beige-dim);
-                   padding:2px 7px;border-radius:999px;font-weight:500">{{ w }}</span>
+    {% if top6 | length > 1 %}
+    <div style="align-self:end;background:var(--line);border-radius:8px;
+                padding:4px 10px;display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+      {% for w in top6[1:] %}
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;
+                   color:var(--beige-dim);font-weight:500">{{ w }}</span>
       {% endfor %}
     </div>
+    {% else %}
+    <div class="stat-note">—</div>
+    {% endif %}
   </div>
 
   <div class="stat">
@@ -433,8 +444,9 @@
     </div>
     <select class="filter-select" id="exitFilter" onchange="filterLog()">
       <option value="">All Cycles</option>
-      <option value="LONG_TP">Exit Long</option>
-      <option value="SHORT_TP">Exit Short</option>
+      <option value="EXIT_LONG">Exit Long</option>
+      <option value="EXIT_SHORT">Exit Short</option>
+      <option value="STOPPED">Stopped</option>
       <option value="ABORTED">Aborted</option>
       <option value="LIQ">Liquidated</option>
     </select>

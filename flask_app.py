@@ -521,10 +521,10 @@ def backtest():
         except Exception as ex:
             bt_error = str(ex)
 
+    d.setdefault('bt_days', 365)
     return render_template('simulator/backtest.html',
                            bt_job_id=bt_job_id, bt_error=bt_error,
                            result=None, bt_log=[], bt_charts={},
-                           bt_days=d.get('bt_days', 365),
                            total_trades=0, top6_ws=[], ws_breakdown=[],
                            **_ctx(d, 'backtest'))
 
@@ -577,7 +577,6 @@ def bt_result_view(job_id):
                            result=result,
                            bt_log=log,
                            bt_charts=charts,
-                           bt_days=d_job.get('bt_days', 365),
                            bt_cap=bt_cap,
                            total_trades=total_trades,
                            growth_pct=growth_pct,

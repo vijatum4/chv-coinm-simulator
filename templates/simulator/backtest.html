@@ -45,30 +45,39 @@
   poll();
 })();
 {% endif %}
+// ── Sync sidebar → run form before submit ───────────────────────────────────
+(function() {
+  var rf = document.getElementById('btRunForm');
+  if (!rf) return;
+  rf.addEventListener('submit', function() {
+    var sf = document.getElementById('sidebarForm');
+    if (!sf) return;
+    Array.from(sf.elements).forEach(function(el) {
+      if (!el.name || el.tagName === 'BUTTON') return;
+      var ex = rf.querySelector('input[name="' + el.name + '"]');
+      if (ex) ex.parentNode.removeChild(ex);
+      if (el.type === 'checkbox') {
+        if (el.checked) {
+          var h = document.createElement('input');
+          h.type = 'hidden'; h.name = el.name; h.value = 'on';
+          rf.appendChild(h);
+        }
+      } else {
+        var h = document.createElement('input');
+        h.type = 'hidden'; h.name = el.name; h.value = el.value;
+        rf.appendChild(h);
+      }
+    });
+  });
+})();
 {% endblock %}
 
 {% block content %}
 <div class="page-title">Backtest <span>Historical Replay</span></div>
 
 {# ─── Run form ─────────────────────────────────────────────────────────── #}
-<form method="POST" action="/sim/backtest" style="margin-bottom:18px">
+<form id="btRunForm" method="POST" action="/sim/backtest" style="margin-bottom:18px">
   <input type="hidden" name="action" value="run">
-  <input type="hidden" name="market_type" value="{{ market_type }}">
-  <input type="hidden" name="symbol" value="{{ symbol }}">
-  <input type="hidden" name="trading_tf" value="{{ trading_tf }}">
-  <input type="hidden" name="atr_tf" value="{{ atr_tf }}">
-  <input type="hidden" name="atr_period" value="{{ atr_period }}">
-  <input type="hidden" name="efficiency_buffer" value="{{ efficiency_buffer }}">
-  <input type="hidden" name="reward_ratio" value="{{ reward_ratio }}">
-  <input type="hidden" name="base_lots" value="{{ base_lots }}">
-  <input type="hidden" name="leverage" value="{{ leverage }}">
-  <input type="hidden" name="capital" value="{{ capital }}">
-  <input type="hidden" name="fee_rate_pct" value="{{ fee_rate_pct }}">
-  <input type="hidden" name="slippage_label" value="{{ slippage_label }}">
-  {% if ws_limit_on %}<input type="hidden" name="ws_limit_on" value="on">{% endif %}
-  <input type="hidden" name="ws_limit" value="{{ ws_limit }}">
-  {% if atr_guard_on %}<input type="hidden" name="atr_guard_on" value="on">{% endif %}
-  <input type="hidden" name="atr_guard_multiplier" value="{{ atr_guard_multiplier }}">
 
   <div class="card card-sm" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     <div style="display:flex;flex-direction:column;gap:3px">

@@ -202,7 +202,7 @@
     <div class="stat-lbl">Max Whipsaws</div>
     <div class="stat-val mono">{{ top6[0] if top6 else 0 }}</div>
     {% if top6 | length > 1 %}
-    <div style="align-self:end;background:var(--line);border-radius:8px;
+    <div style="align-self:end;background:var(--line);border-radius:999px;
                 padding:4px 10px;display:flex;gap:9px;align-items:center;flex-wrap:wrap">
       {% for w in top6[1:] %}
       <span style="font-family:'JetBrains Mono',monospace;font-size:11px;

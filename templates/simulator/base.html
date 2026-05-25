@@ -710,7 +710,7 @@ input[type=range].sf-range::-moz-range-track{
         <span class="sb-label">Position &amp; Capital</span>
 
         <div class="sf-row">
-          <label class="sf-field-label">Base Lots ({{ base_asset }})</label>
+          <label class="sf-field-label" id="baseLotsLabel">Base Lots ({{ base_asset }})</label>
           <input class="sf-input mono" type="number" name="base_lots" value="{{ base_lots }}"
                  step="{{ lot_step }}" min="{{ lot_min }}">
         </div>
@@ -804,15 +804,17 @@ const MARKET_SYMBOLS = {
   'COINM': {{ coinm_symbols | tojson }},
 };
 
-function coinmBase(symbol) {
-  return symbol.replace('USD_PERP', '');
+function getBaseAsset(symbol, marketVal) {
+  if (marketVal === 'COINM') return symbol.replace('USD_PERP', '');
+  return symbol.replace('USDT', '').replace('BUSD', '');
 }
 
-function updateCapitalLabel(marketVal, symbolVal) {
-  const lbl = document.getElementById('capitalLabel');
-  if (!lbl) return;
-  const unit = marketVal === 'COINM' ? coinmBase(symbolVal || '') : 'USD';
-  lbl.textContent = `Capital (${unit})`;
+function updateAssetLabels(marketVal, symbolVal) {
+  const base = getBaseAsset(symbolVal || '', marketVal);
+  const capLbl = document.getElementById('capitalLabel');
+  if (capLbl) capLbl.textContent = marketVal === 'COINM' ? `Capital (${base})` : 'Capital (USD)';
+  const lotsLbl = document.getElementById('baseLotsLabel');
+  if (lotsLbl) lotsLbl.textContent = `Base Lots (${base})`;
 }
 
 function setMarket(val) {
@@ -833,8 +835,8 @@ function setMarket(val) {
   // Reset capital to mode default
   const capInp = document.getElementById('capitalInput');
   if (capInp) capInp.value = val === 'COINM' ? 1 : 1000;
-  // Update capital label
-  updateCapitalLabel(val, newSym);
+  // Update asset-dependent labels
+  updateAssetLabels(val, newSym);
   // Re-fetch price if one was already loaded
   const priceEl = document.getElementById('priceInput');
   if (priceEl && priceEl.value) fetchPriceAtr();
@@ -882,9 +884,9 @@ function fetchPriceAtr() {
 }
 
 function autoFetchSymbol(sel) {
-  // Update capital label when symbol changes (relevant in COINM mode)
+  // Update asset-dependent labels when symbol changes
   const mkt = document.getElementById('marketTypeInput')?.value || 'USDM';
-  updateCapitalLabel(mkt, sel.value);
+  updateAssetLabels(mkt, sel.value);
   // auto-fetch when symbol changes if price already loaded
   const priceEl = document.getElementById('priceInput');
   if (priceEl && priceEl.value) fetchPriceAtr();

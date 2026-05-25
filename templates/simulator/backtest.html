@@ -4,11 +4,11 @@
 {% block extra_css %}
 /* Negative P&L featured card */
 .stat.featured.neg-pnl {
-  background: linear-gradient(155deg, oklch(0.42 0.17 28) 0%, oklch(0.32 0.14 28) 100%);
+  background: oklch(0.22 0.07 28);
 }
-.stat.featured.neg-pnl .stat-lbl { color: rgba(255,200,180,0.60) }
-.stat.featured.neg-pnl .stat-val { color: #fff8f6 }
-.stat.featured.neg-pnl .stat-foot { background: rgba(0,0,0,0.20); color: rgba(255,190,170,0.90) }
+.stat.featured.neg-pnl .stat-lbl { color: oklch(0.66 0.18 28 / 0.55) }
+.stat.featured.neg-pnl .stat-val { color: var(--neg); font-size: 20px }
+.stat.featured.neg-pnl .stat-foot { background: rgba(0,0,0,0.20); color: var(--neg) }
 
 /* Whipsaw breakdown: N + Distribution + Count + % + Σ% */
 .wh-table { grid-template-columns: 28px 1fr 44px 60px 60px }

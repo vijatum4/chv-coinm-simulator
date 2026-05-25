@@ -1,0 +1,443 @@
+{% extends "simulator/base.html" %}
+{% set COIN_NAMES = {
+  'SOL':'Solana','BTC':'Bitcoin','ETH':'Ethereum','BNB':'BNB','XRP':'XRP',
+  'ADA':'Cardano','DOT':'Polkadot','LINK':'Chainlink','LTC':'Litecoin',
+  'BCH':'Bitcoin Cash','DOGE':'Dogecoin','AVAX':'Avalanche',
+  'FARTCOIN':'Fartcoin','SUI':'Sui','NEAR':'NEAR','JUP':'Jupiter',
+  'JTO':'Jito','ONDO':'Ondo','XAU':'Gold'
+} %}
+{% set coin_full = COIN_NAMES.get(base_asset, base_asset) %}
+{% set mode_label = 'COINM' if market_type=='coinm' else 'USDM' %}
+{% set sym_unit   = settle_coin if (market_type=='coinm') else 'USDT' %}
+
+{% block title %}{{ mode_label }} · {{ coin_full }} Backtest — CHV Sim{% endblock %}
+
+{% block head %}
+<style>
+/* ── Stat cards ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:var(--olive-900);border:1px solid var(--line);border-radius:14px;padding:16px}
+.stat-card.neg-card{border-color:oklch(0.45 0.12 28 / 0.6);background:var(--neg-bg)}
+.stat-label{font-size:10.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.stat-val{font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:-0.03em;color:var(--beige);line-height:1}
+.stat-val.pos{color:var(--green)}
+.stat-val.neg{color:var(--neg)}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:6px}
+
+/* ── Charts ── */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.chart-card{background:var(--olive-900);border:1px solid var(--line);border-radius:14px;padding:16px}
+.chart-title{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:12px}
+.chart-svg{width:100%;display:block}
+
+/* ── WS breakdown table ── */
+.ws-table{width:100%;border-collapse:collapse;font-size:13px}
+.ws-table th{text-align:left;padding:8px 10px;font-size:10.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
+.ws-table td{padding:8px 10px;border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:12.5px}
+.ws-table tr:last-child td{border-bottom:none}
+.dist-bar-bg{background:var(--olive-700);border-radius:4px;height:8px;overflow:hidden;min-width:80px}
+.dist-bar-fill{height:100%;border-radius:4px;background:var(--green)}
+.dist-bar-fill.warn{background:var(--gold)}
+.dist-bar-fill.neg{background:var(--neg)}
+
+/* ── Cycle log ── */
+.log-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.log-search{
+  flex:1;min-width:160px;max-width:320px;
+  padding:8px 12px;font-size:13px;font-family:'Inter Tight',sans-serif;
+  background:var(--olive-700);border:1px solid var(--line-strong);border-radius:8px;
+  color:var(--beige);outline:none;
+}
+.log-search:focus{border-color:var(--green)}
+.log-search::placeholder{color:var(--muted)}
+.log-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.log-table th{text-align:left;padding:8px 8px;font-size:10.5px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap}
+.log-table td{padding:8px 8px;border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:12px;vertical-align:middle;white-space:nowrap}
+.log-table tr:last-child td{border-bottom:none}
+.log-table tr:hover td{background:rgba(181,224,0,0.04)}
+.liq-row td{background:var(--neg-bg)!important}
+.ws-dot{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;font-size:11px;font-weight:700}
+.ws-dot.pos{background:rgba(181,224,0,0.12);color:var(--green)}
+.ws-dot.warn{background:rgba(250,221,86,0.12);color:var(--gold)}
+.ws-dot.neg{background:var(--neg-bg);color:var(--neg)}
+
+/* ── Progress bar ── */
+.progress-wrap{background:var(--olive-900);border:1px solid var(--line);border-radius:14px;padding:24px;margin-bottom:24px;text-align:center}
+.progress-bar-bg{background:var(--olive-700);border-radius:999px;height:8px;overflow:hidden;margin:12px 0}
+.progress-bar-fill{height:100%;background:var(--green);border-radius:999px;transition:width 0.4s}
+.progress-msg{font-size:13px;color:var(--muted)}
+
+/* ── Backtest form ── */
+.bt-form-row{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+
+/* ── WIL stat card ── */
+.wil-sub{font-size:11px;color:var(--muted);margin-top:4px}
+
+/* ── Summary footer in WIL card ── */
+.stat-foot{font-size:11px;color:var(--muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Page title -->
+<div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:20px">
+  <h1 class="page-title" style="margin-bottom:0">
+    {% if result %}
+      {{ mode_label }} · {{ coin_full }} Backtest
+    {% else %}
+      Backtest
+    {% endif %}
+    <span>{{ base_asset }}/{{ sym_unit }}</span>
+  </h1>
+</div>
+
+<!-- Backtest run form -->
+<form method="POST" action="/sim/backtest" class="card card-sm" style="margin-bottom:20px">
+  <input type="hidden" name="action" value="run">
+  <input type="hidden" name="market_type" value="{{ market_type }}">
+  <input type="hidden" name="symbol" value="{{ symbol }}">
+  <input type="hidden" name="trading_tf" value="{{ trading_tf }}">
+  <input type="hidden" name="atr_tf" value="{{ atr_tf }}">
+  <input type="hidden" name="atr_period" value="{{ atr_period }}">
+  <input type="hidden" name="efficiency_buffer" value="{{ efficiency_buffer }}">
+  <input type="hidden" name="reward_ratio" value="{{ reward_ratio }}">
+  <input type="hidden" name="base_lots" value="{{ base_lots }}">
+  <input type="hidden" name="leverage" value="{{ leverage }}">
+  <input type="hidden" name="capital" value="{{ capital }}">
+  <input type="hidden" name="fee_rate_pct" value="{{ fee_rate_pct }}">
+  <input type="hidden" name="slippage_label" value="{{ slippage_label }}">
+  {% if ws_limit_on %}<input type="hidden" name="ws_limit_on" value="on">{% endif %}
+  <input type="hidden" name="ws_limit" value="{{ ws_limit }}">
+  {% if atr_guard_on %}<input type="hidden" name="atr_guard_on" value="on">{% endif %}
+  <input type="hidden" name="atr_guard_multiplier" value="{{ atr_guard_multiplier }}">
+  <div class="bt-form-row">
+    <div style="display:flex;align-items:center;gap:8px">
+      <label style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Period</label>
+      <select name="bt_days" class="sf-select" style="width:120px">
+        {% for d in [30,60,90,180,365] %}
+        <option value="{{ d }}" {% if bt_days==d %}selected{% endif %}>{{ d }} days</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-green">▶ Run Backtest</button>
+    {% if bt_error %}<span style="font-size:13px;color:var(--neg)">{{ bt_error }}</span>{% endif %}
+  </div>
+</form>
+
+<!-- Progress (job running) -->
+{% if bt_job_id and not result %}
+<div class="progress-wrap" id="progressWrap" data-job="{{ bt_job_id }}">
+  <div style="font-size:14px;font-weight:600;color:var(--beige)">Running backtest…</div>
+  <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
+  <div class="progress-msg" id="progressMsg">Starting…</div>
+</div>
+{% endif %}
+
+{% if result %}
+<!-- ── Stat cards ── -->
+{% set total = result.total_cycles %}
+{% set wins  = result.winning_cycles %}
+{% set wr    = (wins/total*100) if total else 0 %}
+{% set coinm = market_type == 'coinm' %}
+
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-label">Total Cycles</div>
+    <div class="stat-val">{{ total }}</div>
+    <div class="stat-sub">{{ total_trades }} total trades</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Win Rate</div>
+    <div class="stat-val {% if wr>=50 %}pos{% else %}neg{% endif %}">{{ '%.1f'|format(wr) }}%</div>
+    <div class="stat-sub">{{ wins }} wins / {{ total - wins }} losses</div>
+  </div>
+  <div class="stat-card {% if result.total_net_pnl < 0 %}neg-card{% endif %}">
+    <div class="stat-label">Net P&L</div>
+    <div class="stat-val {% if result.total_net_pnl >= 0 %}pos{% else %}neg{% endif %}">
+      {% if coinm %}
+        {{ '%.4f'|format(result.total_net_pnl) }}
+      {% else %}
+        {% if result.total_net_pnl >= 0 %}+${{ '%.2f'|format(result.total_net_pnl) }}{% else %}-${{ '%.2f'|format(result.total_net_pnl|abs) }}{% endif %}
+      {% endif %}
+    </div>
+    <div class="stat-sub">{{ settle_coin if coinm else 'USDT' }}</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Avg WS / Cycle</div>
+    <div class="stat-val">{{ '%.1f'|format(result.avg_whipsaws if result.avg_whipsaws is defined else (result.cycles|map(attribute='whipsaws')|sum / total if total else 0)) }}</div>
+    <div class="stat-sub">Max: {{ result.cycles|map(attribute='whipsaws')|max if result.cycles else 0 }}</div>
+  </div>
+  <div class="stat-card {% if result.worst_intra_loss < 0 %}neg-card{% endif %}">
+    <div class="stat-label">Worst Cycle Low</div>
+    <div class="stat-val mono neg" style="font-size:18px">
+      {% if coinm %}
+        {{ '%.4f'|format(result.worst_intra_loss) }}
+      {% else %}
+        {% if result.worst_intra_loss >= 0 %}+${{ '%.2f'|format(result.worst_intra_loss) }}{% else %}-${{ '%.2f'|format(result.worst_intra_loss|abs) }}{% endif %}
+      {% endif %}
+    </div>
+    <div class="stat-sub">Cycle #{{ result.worst_intra_loss_cycle }}</div>
+    {% if wil_ns_cap and wil_ns_cap != '—' %}
+    <div class="stat-foot">Capital: {{ wil_ns_cap }}</div>
+    {% endif %}
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Fee Used</div>
+    <div class="stat-val mono" style="font-size:18px">{{ fee_pct_used }}%</div>
+    <div class="stat-sub">{{ total_trades }} trades</div>
+  </div>
+  {% if result.liquidated %}
+  <div class="stat-card neg-card">
+    <div class="stat-label">Liquidated</div>
+    <div class="stat-val neg" style="font-size:18px">💀 YES</div>
+    <div class="stat-sub">Capital depleted</div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Charts ── -->
+{% if bt_charts %}
+{% set ch = bt_charts %}
+<div class="chart-grid">
+  <!-- Equity Curve -->
+  <div class="chart-card">
+    <div class="chart-title">Equity Curve</div>
+    <svg class="chart-svg" viewBox="0 0 750 280" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="eq_grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#B5E000" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#B5E000" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <!-- Y labels -->
+      {% for lbl in ch.eq_y_lbls %}
+      <line x1="38" y1="{{ lbl.y }}" x2="714" y2="{{ lbl.y }}" stroke="rgba(236,239,206,0.08)" stroke-width="1"/>
+      <text x="36" y="{{ lbl.y + 4 }}" fill="var(--muted)" font-size="10" text-anchor="end" font-family="JetBrains Mono">{{ lbl.label }}</text>
+      {% endfor %}
+      <!-- X labels -->
+      {% for lbl in ch.eq_x_lbls %}
+      <text x="{{ lbl.x }}" y="270" fill="var(--muted)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">{{ lbl.label }}</text>
+      {% endfor %}
+      <!-- Area -->
+      <path d="{{ ch.eq_area }}" fill="url(#eq_grad)"/>
+      <!-- Line -->
+      <path d="{{ ch.eq_line }}" fill="none" stroke="var(--green)" stroke-width="2"/>
+      <!-- Dot -->
+      <circle cx="{{ ch.eq_dot[0] }}" cy="{{ ch.eq_dot[1] }}" r="4" fill="var(--green)"/>
+    </svg>
+  </div>
+
+  <!-- Capital/Cycle -->
+  <div class="chart-card">
+    <div class="chart-title">Capital / Cycle</div>
+    <svg class="chart-svg" viewBox="0 0 750 280" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="cap_grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#7BC6F2" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#7BC6F2" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      {% for lbl in ch.cap_y_lbls %}
+      <line x1="38" y1="{{ lbl.y }}" x2="714" y2="{{ lbl.y }}" stroke="rgba(236,239,206,0.08)" stroke-width="1"/>
+      <text x="36" y="{{ lbl.y + 4 }}" fill="var(--muted)" font-size="10" text-anchor="end" font-family="JetBrains Mono">{{ lbl.label }}</text>
+      {% endfor %}
+      {% for lbl in ch.cap_x_lbls %}
+      <text x="{{ lbl.x }}" y="270" fill="var(--muted)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">{{ lbl.label }}</text>
+      {% endfor %}
+      <path d="{{ ch.cap_area }}" fill="url(#cap_grad)"/>
+      <path d="{{ ch.cap_line }}" fill="none" stroke="var(--sky)" stroke-width="2"/>
+    </svg>
+  </div>
+
+  <!-- Capital/Trade -->
+  <div class="chart-card">
+    <div class="chart-title">Capital / Trade</div>
+    <svg class="chart-svg" viewBox="0 0 750 280" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="ct_grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#FADD56" stop-opacity="0.20"/>
+          <stop offset="100%" stop-color="#FADD56" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      {% for lbl in ch.ct_y_lbls %}
+      <line x1="38" y1="{{ lbl.y }}" x2="714" y2="{{ lbl.y }}" stroke="rgba(236,239,206,0.08)" stroke-width="1"/>
+      <text x="36" y="{{ lbl.y + 4 }}" fill="var(--muted)" font-size="10" text-anchor="end" font-family="JetBrains Mono">{{ lbl.label }}</text>
+      {% endfor %}
+      {% for lbl in ch.ct_x_lbls %}
+      <text x="{{ lbl.x }}" y="270" fill="var(--muted)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">{{ lbl.label }}</text>
+      {% endfor %}
+      <path d="{{ ch.ct_area }}" fill="url(#ct_grad)"/>
+      <path d="{{ ch.ct_line }}" fill="none" stroke="var(--gold)" stroke-width="1.5"/>
+    </svg>
+  </div>
+
+  <!-- Whipsaws per cycle -->
+  <div class="chart-card">
+    <div class="chart-title">Whipsaws / Cycle</div>
+    <svg class="chart-svg" viewBox="0 0 750 280" xmlns="http://www.w3.org/2000/svg">
+      {% for bar in ch.ws_bars %}
+      {% set col = '#B5E000' if bar.color=='pos' else ('#FADD56' if bar.color=='warn' else 'oklch(0.66 0.18 28)') %}
+      <rect x="{{ bar.x }}" y="{{ 240 - bar.h }}" width="{{ bar.w }}" height="{{ bar.h }}"
+            fill="{{ col }}" opacity="0.7" rx="2"/>
+      {% if bar.ws > 0 and bar.w > 12 %}
+      <text x="{{ bar.x + bar.w/2 }}" y="{{ 240 - bar.h - 3 }}" fill="{{ col }}" font-size="9"
+            text-anchor="middle" font-family="JetBrains Mono">{{ bar.ws }}</text>
+      {% endif %}
+      {% endfor %}
+      <line x1="40" y1="240" x2="714" y2="240" stroke="var(--line-strong)" stroke-width="1"/>
+    </svg>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Whipsaw Breakdown ── -->
+{% if top6_ws %}
+{% set ws_counter = namespace() %}
+{% set sorted_ws = top6_ws %}
+<div class="card" style="margin-bottom:24px">
+  <div style="font-size:13px;font-weight:700;color:var(--beige);margin-bottom:14px">Top Whipsaws</div>
+  <!-- Build frequency table from bt_log -->
+  {% set ws_counts = namespace(data={}) %}
+  {% for row in bt_log %}
+    {% set n = row.ws %}
+    {% if n not in ws_counts.data %}
+      {% set _ = ws_counts.data.update({n: 0}) %}
+    {% endif %}
+    {% set _ = ws_counts.data.update({n: ws_counts.data[n] + 1}) %}
+  {% endfor %}
+  {% set ws_sorted = ws_counts.data.keys()|sort(reverse=True) %}
+  {% set tot = bt_log|length %}
+  {% set cum = namespace(val=0) %}
+  <table class="ws-table">
+    <thead>
+      <tr>
+        <th>N</th>
+        <th>Distribution</th>
+        <th>Cycles</th>
+        <th>%</th>
+        <th>Σ%</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for n in ws_sorted %}
+      {% set cnt = ws_counts.data[n] %}
+      {% set pct = (cnt/tot*100) if tot else 0 %}
+      {% set _ = cum.__setattr__('val', cum.val + pct) %}
+      {% set bar_color = 'pos' if n==0 else ('warn' if n<=5 else 'neg') %}
+      <tr>
+        <td><span class="ws-dot {{ bar_color }}">{{ n }}</span></td>
+        <td>
+          <div class="dist-bar-bg" style="width:120px">
+            <div class="dist-bar-fill {{ bar_color }}" style="width:{{ pct }}%"></div>
+          </div>
+        </td>
+        <td>{{ cnt }}</td>
+        <td>{{ '%.1f'|format(pct) }}%</td>
+        <td>{{ '%.1f'|format(cum.val) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- ── Cycle Log ── -->
+{% if bt_log %}
+<div class="card">
+  <div class="log-controls">
+    <div style="font-size:13px;font-weight:700;color:var(--beige)">Cycle Log</div>
+    <input type="search" class="log-search" id="cycleSearch" placeholder="🔍  Search cycles…" oninput="filterCycleLog(this.value)">
+    <a href="/sim/backtest/download-csv?job_id={{ bt_job_id or '' }}" class="btn btn-dark btn-sm" download>⬇ Download CSV</a>
+  </div>
+  <div style="overflow-x:auto">
+    <table class="log-table" id="cycleLogTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Capital</th>
+          <th>P&L</th>
+          <th>WS</th>
+          <th>Entry</th>
+          <th>ATR</th>
+          <th>LP</th>
+          <th>SP</th>
+          <th>Worst Loss</th>
+          <th>Duration</th>
+          <th>Exit</th>
+          <th>Start UTC</th>
+          <th>End UTC</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in bt_log %}
+        <tr class="{% if r.liq %}liq-row{% endif %}">
+          <td>{{ r.num }}</td>
+          <td>{{ r.capital }}</td>
+          <td class="{% if r.pnl_pos %}pos{% else %}neg-val{% endif %}">{{ r.pnl_fmt }}</td>
+          <td><span class="ws-dot {{ r.ws_color }}">{{ r.ws }}</span></td>
+          <td>{{ r.entry }}</td>
+          <td>{{ r.atr }}</td>
+          <td>{{ r.lp }}</td>
+          <td>{{ r.sp }}</td>
+          <td class="{% if r.worst_neg %}neg-val{% endif %}">{{ r.worst }}</td>
+          <td>{{ r.dur }}</td>
+          <td>{{ r.exit }}</td>
+          <td style="color:var(--muted)">{{ r.start }}</td>
+          <td style="color:var(--muted)">{{ r.end }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% elif bt_job_id %}
+<!-- job polling handled by JS -->
+{% else %}
+<!-- No result yet -->
+<div class="card" style="text-align:center;padding:40px">
+  <div style="font-size:32px;margin-bottom:12px">📊</div>
+  <div style="font-size:15px;font-weight:600;color:var(--beige-dim)">Set parameters and run a backtest</div>
+  <div style="font-size:13px;color:var(--muted);margin-top:6px">Results will appear here</div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Cycle log search ──
+function filterCycleLog(q) {
+  const rows = document.querySelectorAll('#cycleLogTable tbody tr');
+  const ql = q.toLowerCase();
+  rows.forEach(row => {
+    row.style.display = (!q || row.textContent.toLowerCase().includes(ql)) ? '' : 'none';
+  });
+}
+
+// ── Job polling ──
+{% if bt_job_id and not result %}
+(function poll() {
+  const jobId = '{{ bt_job_id }}';
+  fetch('/sim/backtest/status/' + jobId)
+    .then(r => r.json())
+    .then(d => {
+      const fill = document.getElementById('progressFill');
+      const msg  = document.getElementById('progressMsg');
+      if (fill) fill.style.width = d.progress + '%';
+      if (msg)  msg.textContent = d.msg || '';
+      if (d.status === 'done') {
+        window.location = '/sim/backtest/result/' + jobId;
+      } else if (d.status === 'error') {
+        if (msg) msg.textContent = '❌ ' + (d.msg || 'Error');
+      } else {
+        setTimeout(poll, 800);
+      }
+    })
+    .catch(() => setTimeout(poll, 2000));
+})();
+{% endif %}
+</script>
+{% endblock %}

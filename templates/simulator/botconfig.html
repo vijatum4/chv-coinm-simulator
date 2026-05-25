@@ -1,0 +1,40 @@
+{% extends "simulator/base.html" %}
+{% block title %}Bot Config — CHV Sim{% endblock %}
+{% block head %}
+<style>
+.config-pre{background:var(--olive-900);border:1px solid var(--line);border-radius:12px;padding:20px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--beige-dim);overflow-x:auto;white-space:pre;line-height:1.6}
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page-title">Bot Config <span>Export Settings</span></h1>
+<div class="card" style="margin-bottom:16px">
+  <div style="font-size:13px;color:var(--beige-dim);margin-bottom:16px">Current sidebar parameters as bot config JSON. Copy this to deploy your CHV bot.</div>
+  <pre class="config-pre">{
+  "symbol":             "{{ symbol }}",
+  "market_type":        "{{ market_type }}",
+  "trading_tf":         "{{ trading_tf }}",
+  "atr_tf":             "{{ atr_tf }}",
+  "atr_period":         {{ atr_period }},
+  "efficiency_buffer":  {{ efficiency_buffer }},
+  "reward_ratio":       {{ reward_ratio }},
+  "base_lots":          {{ base_lots }},
+  "leverage":           {{ leverage }},
+  "capital":            {{ capital }},
+  "fee_rate_pct":       {{ fee_rate_pct }},
+  "ws_limit_on":        {{ 'true' if ws_limit_on else 'false' }},
+  "ws_limit":           {{ ws_limit }},
+  "atr_guard_on":       {{ 'true' if atr_guard_on else 'false' }},
+  "atr_guard_multiplier": {{ atr_guard_multiplier }},
+  "settle_coin":        "{{ settle_coin }}"
+}</pre>
+</div>
+<button class="btn btn-dark btn-sm" onclick="copyConfig()">📋 Copy JSON</button>
+{% endblock %}
+{% block scripts %}
+<script>
+function copyConfig() {
+  const txt = document.querySelector('.config-pre').textContent;
+  navigator.clipboard.writeText(txt).then(()=>alert('Copied!'));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "simulator/base.html" %}
+{% block title %}About — CHV Sim{% endblock %}
+{% block head %}
+<style>
+.about-section{background:var(--olive-900);border:1px solid var(--line);border-radius:14px;padding:24px;margin-bottom:16px}
+.about-section h3{font-size:14px;font-weight:700;color:var(--green);margin-bottom:10px}
+.about-section p,.about-section li{font-size:13px;color:var(--beige-dim);line-height:1.7}
+.about-section ul{padding-left:18px}
+.about-section li{margin-bottom:6px}
+.version-tag{display:inline-flex;align-items:center;gap:6px;background:var(--olive-700);border:1px solid var(--line-strong);border-radius:999px;padding:4px 12px;font-size:12px;color:var(--beige-dim);margin-bottom:20px}
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page-title">About</h1>
+<div class="version-tag">CHV Recovery Simulator · v2.0 · Flask 3.1</div>
+
+<div class="about-section">
+  <h3>Strategy</h3>
+  <p>The CHV (Cascading Hedge & Vindication) Recovery strategy is a systematic approach to trading perpetual futures. It uses ATR-based entry/exit levels and a compounding lot-size recovery scheme to turn whipsaw sequences into profitable cycles over time.</p>
+</div>
+
+<div class="about-section">
+  <h3>Engine</h3>
+  <ul>
+    <li><strong>USDM</strong> — Standard perpetual futures (e.g. SOLUSDT). P&L settled in USDT. Standard lot × price math.</li>
+    <li><strong>CoinM (Inverse)</strong> — Inverse perpetual futures (e.g. DOTUSD_PERP). Contracts priced in USD, settled in base coin. P&L = lots × cs × (1/entry − 1/exit).</li>
+    <li>Backtests pull historical klines from Binance REST API (dapi for CoinM, fapi for USDM).</li>
+    <li>ATR is calculated using Wilder's smoothed method over the configured period.</li>
+  </ul>
+</div>
+
+<div class="about-section">
+  <h3>Infrastructure</h3>
+  <ul>
+    <li>Flask 3.1 · Python 3.12 · PM2 process <code style="font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--olive-700);padding:1px 5px;border-radius:4px">chv-simulator</code></li>
+    <li>Served at <code style="font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--olive-700);padding:1px 5px;border-radius:4px">port 8503</code> · Nginx proxy at <code style="font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--olive-700);padding:1px 5px;border-radius:4px">/sim/</code></li>
+  </ul>
+</div>
+{% endblock %}

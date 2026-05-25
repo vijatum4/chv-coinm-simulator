@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}CHV Recovery Simulator{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --olive-900: #0a1a00; --olive-800: #122D00; --olive-700: #1a3d05;
+  --olive-600: #214d0a; --olive-500: #2f6614;
+  --line: rgba(236,239,206,0.10); --line-strong: rgba(236,239,206,0.20);
+  --beige: #ECEFCE; --beige-dim: #b6bf94; --muted: #7c8a5e;
+  --green: #B5E000; --green-soft: #c9ee2c; --gold: #FADD56;
+  --sky: #7BC6F2; --white: #ffffff;
+  --neg: oklch(0.66 0.18 28); --neg-bg: oklch(0.30 0.10 28 / 0.35);
+  --sidebar-w: 260px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100vh}
+body{background:var(--olive-800);color:var(--beige);font-family:'Inter Tight',sans-serif;font-feature-settings:'ss01' on,'cv11' on;-webkit-font-smoothing:antialiased}
+.mono{font-family:'JetBrains Mono',monospace;font-feature-settings:'zero' on}
+
+/* ── Layout ── */
+.app-layout{display:flex;min-height:100vh}
+.sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);
+  background:var(--olive-900);border-right:1px solid var(--line);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;
+}
+.main{flex:1;min-width:0;padding:28px 32px 80px}
+
+/* ── Sidebar Nav ── */
+.nav-logo{padding:20px 16px 12px;border-bottom:1px solid var(--line)}
+.nav-logo-text{font-size:13px;font-weight:700;color:var(--green);letter-spacing:0.05em;text-transform:uppercase}
+.nav-logo-sub{font-size:11px;color:var(--muted);margin-top:2px}
+nav{padding:8px 0;border-bottom:1px solid var(--line)}
+nav a{
+  display:flex;align-items:center;gap:8px;
+  padding:9px 16px;font-size:13px;font-weight:500;color:var(--beige-dim);
+  text-decoration:none;border-radius:0;transition:background 0.15s,color 0.15s;
+}
+nav a:hover{background:var(--olive-700);color:var(--beige)}
+nav a.active{background:var(--olive-700);color:var(--green);font-weight:600}
+nav a .icon{font-size:15px;width:20px;text-align:center}
+
+/* ── Sidebar Form ── */
+.sidebar-form{flex:1;overflow-y:auto;padding:12px 0 16px}
+.sf-section{padding:0 12px;margin-bottom:8px}
+.sf-label{font-size:10.5px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;display:block}
+
+/* Market type tabs */
+.market-tabs{display:flex;gap:4px;margin-bottom:10px}
+.market-tab{
+  flex:1;padding:7px 4px;font-size:12px;font-weight:600;text-align:center;
+  border:1px solid var(--line-strong);border-radius:8px;cursor:pointer;
+  background:transparent;color:var(--muted);transition:all 0.15s;
+}
+.market-tab.active{background:var(--olive-600);color:var(--beige);border-color:var(--olive-500)}
+.market-tab:hover:not(.active){background:var(--olive-700);color:var(--beige-dim)}
+
+/* Form controls */
+.sf-select,.sf-input{
+  width:100%;padding:7px 10px;font-size:12.5px;font-family:'Inter Tight',sans-serif;
+  background:var(--olive-700);border:1px solid var(--line-strong);border-radius:8px;
+  color:var(--beige);appearance:none;-webkit-appearance:none;
+  outline:none;transition:border-color 0.15s;
+}
+.sf-select:focus,.sf-input:focus{border-color:var(--green)}
+.sf-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.sf-col{display:flex;flex-direction:column;gap:4px}
+.sf-col .sf-label{margin-bottom:0}
+
+/* Toggle switch */
+.toggle-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.toggle-label{font-size:12px;color:var(--beige-dim);flex:1}
+.toggle{position:relative;width:36px;height:20px;cursor:pointer}
+.toggle input{opacity:0;width:0;height:0;position:absolute}
+.toggle-track{
+  position:absolute;inset:0;background:var(--olive-600);border-radius:999px;
+  transition:background 0.2s;border:1px solid var(--line-strong);
+}
+.toggle input:checked~.toggle-track{background:var(--olive-500);border-color:var(--green)}
+.toggle-thumb{
+  position:absolute;top:3px;left:3px;width:14px;height:14px;
+  background:var(--beige-dim);border-radius:50%;transition:transform 0.2s,background 0.2s;
+}
+.toggle input:checked~.toggle-track~.toggle-thumb,
+.toggle input:checked+.toggle-track+.toggle-thumb{background:var(--green)}
+.toggle input:checked~.toggle-thumb{transform:translateX(16px)}
+
+/* Sidebar run btn */
+.sf-run-btn{
+  width:100%;padding:11px;font-size:13px;font-weight:700;
+  background:var(--green);color:var(--olive-900);border:none;border-radius:10px;
+  cursor:pointer;margin-top:8px;transition:background 0.15s;letter-spacing:0.02em;
+}
+.sf-run-btn:hover{background:var(--green-soft)}
+
+/* Notional info */
+.sf-note{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
+.sf-note.ok{color:var(--green)}
+.sf-note.warn{color:var(--gold)}
+
+/* ── Util ── */
+.badge{
+  display:inline-flex;align-items:center;padding:3px 9px;border-radius:999px;
+  font-size:11px;font-weight:600;letter-spacing:0.04em;
+}
+.badge-green{background:rgba(181,224,0,0.15);color:var(--green)}
+.badge-gold{background:rgba(250,221,86,0.15);color:var(--gold)}
+.badge-neg{background:var(--neg-bg);color:var(--neg)}
+.badge-sky{background:rgba(123,198,242,0.15);color:var(--sky)}
+.badge-muted{background:var(--line);color:var(--muted)}
+
+.btn{
+  border:0;cursor:pointer;font:inherit;font-weight:600;font-size:13px;
+  padding:9px 16px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;
+  text-decoration:none;transition:background 0.15s;
+}
+.btn-dark{background:var(--olive-700);color:var(--beige);border:1px solid var(--line-strong)}
+.btn-dark:hover{background:var(--olive-600);color:var(--beige)}
+.btn-green{background:var(--green);color:var(--olive-900)}
+.btn-green:hover{background:var(--green-soft)}
+.btn-sm{font-size:12px;padding:6px 12px}
+
+.card{background:var(--olive-900);border:1px solid var(--line);border-radius:16px;padding:20px}
+.card-sm{padding:14px 16px}
+
+.page-title{font-size:22px;font-weight:700;color:var(--beige);letter-spacing:-0.02em;margin-bottom:20px}
+.page-title span{color:var(--muted);font-weight:400;font-size:16px;margin-left:8px}
+
+.divider{border:none;border-top:1px solid var(--line);margin:20px 0}
+
+/* Positive / Negative coloring */
+.pos{color:var(--green)}
+.neg-val{color:var(--neg)}
+.warn{color:var(--gold)}
+</style>
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="app-layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="nav-logo">
+      <div class="nav-logo-text">CHV Simulator</div>
+      <div class="nav-logo-sub">Recovery Trade Engine</div>
+    </div>
+    <nav>
+      <a href="/sim/guide" class="{% if mode=='guide' %}active{% endif %}"><span class="icon">📖</span> Guide</a>
+      <a href="/sim/simulator" class="{% if mode=='simulator' %}active{% endif %}"><span class="icon">🔬</span> Simulator</a>
+      <a href="/sim/backtest" class="{% if mode=='backtest' %}active{% endif %}"><span class="icon">📊</span> Backtest</a>
+      <a href="/sim/optimizer" class="{% if mode=='optimizer' %}active{% endif %}"><span class="icon">⚙️</span> Optimizer</a>
+      <a href="/sim/botconfig" class="{% if mode=='botconfig' %}active{% endif %}"><span class="icon">🤖</span> Bot Config</a>
+      <a href="/sim/history" class="{% if mode=='history' %}active{% endif %}"><span class="icon">📁</span> History</a>
+      <a href="/sim/about" class="{% if mode=='about' %}active{% endif %}"><span class="icon">ℹ️</span> About</a>
+    </nav>
+
+    <!-- Sidebar form -->
+    <form class="sidebar-form" method="POST" action="{{ request.path }}" id="sidebarForm">
+      <input type="hidden" name="market_type" id="market_type_input" value="{{ market_type or 'usdm' }}">
+
+      <!-- Market Type Tabs -->
+      <div class="sf-section" style="margin-top:10px">
+        <div class="market-tabs">
+          <button type="button" class="market-tab {% if market_type=='usdm' %}active{% endif %}" onclick="setMarket('usdm')">USDM</button>
+          <button type="button" class="market-tab {% if market_type=='coinm' %}active{% endif %}" onclick="setMarket('coinm')">CoinM</button>
+        </div>
+        <label class="sf-label">Asset</label>
+        <select name="symbol" class="sf-select" id="symbolSelect" onchange="this.form.submit()">
+          {% if market_type == 'coinm' %}
+            {% for s in ['BTCUSD_PERP','ETHUSD_PERP','BNBUSD_PERP','XRPUSD_PERP','ADAUSD_PERP','SOLUSD_PERP','DOTUSD_PERP','LINKUSD_PERP','LTCUSD_PERP','BCHUSD_PERP'] %}
+            <option value="{{ s }}" {% if symbol==s %}selected{% endif %}>{{ s.replace('USD_PERP','') }}</option>
+            {% endfor %}
+          {% else %}
+            {% for s in ['SOLUSDT','BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','DOGEUSDT','AVAXUSDT','SUIUSDT','FARTCOINUSDT','NEARUSDT','JUPUSDT','JTOUSDT','ONDOUSDT'] %}
+            <option value="{{ s }}" {% if symbol==s %}selected{% endif %}>{{ s.replace('USDT','') }}/USDT</option>
+            {% endfor %}
+          {% endif %}
+        </select>
+        {% if notional_ok %}
+        <div class="sf-note ok">{{ notional_ok }}</div>
+        {% endif %}
+      </div>
+
+      <!-- Timeframe -->
+      <div class="sf-section">
+        <div class="sf-row">
+          <div class="sf-col">
+            <label class="sf-label">Trade TF</label>
+            <select name="trading_tf" class="sf-select">
+              {% for t in tf_choices %}<option value="{{ t }}" {% if trading_tf==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="sf-col">
+            <label class="sf-label">ATR TF</label>
+            <select name="atr_tf" class="sf-select">
+              {% for t in tf_choices %}<option value="{{ t }}" {% if atr_tf==t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="sf-row">
+          <div class="sf-col">
+            <label class="sf-label">ATR Period</label>
+            <input class="sf-input mono" type="number" name="atr_period" value="{{ atr_period }}" min="5" max="50">
+          </div>
+          <div class="sf-col">
+            <label class="sf-label">Buffer</label>
+            <select name="efficiency_buffer" class="sf-select">
+              {% for b in buffer_choices %}<option value="{{ b }}" {% if efficiency_buffer==b %}selected{% endif %}>{{ b }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- RR / Leverage / Lots -->
+      <div class="sf-section">
+        <div class="sf-row">
+          <div class="sf-col">
+            <label class="sf-label">RR Ratio</label>
+            <input class="sf-input mono" type="number" name="reward_ratio" value="{{ reward_ratio }}" step="0.1" min="1">
+          </div>
+          <div class="sf-col">
+            <label class="sf-label">Leverage</label>
+            <input class="sf-input mono" type="number" name="leverage" value="{{ leverage }}" min="1" max="125">
+          </div>
+        </div>
+        <div class="sf-row">
+          <div class="sf-col">
+            <label class="sf-label">Base Lots</label>
+            <input class="sf-input mono" type="number" name="base_lots" value="{{ base_lots }}" step="1" min="1">
+          </div>
+          <div class="sf-col">
+            <label class="sf-label">Capital</label>
+            <input class="sf-input mono" type="number" name="capital" value="{{ capital }}" step="100" min="10">
+          </div>
+        </div>
+      </div>
+
+      <!-- Fees / Slippage -->
+      <div class="sf-section">
+        <div class="sf-row">
+          <div class="sf-col">
+            <label class="sf-label">Fee %</label>
+            <input class="sf-input mono" type="number" name="fee_rate_pct" value="{{ fee_rate_pct }}" step="0.01" min="0">
+          </div>
+          <div class="sf-col">
+            <label class="sf-label">Slippage</label>
+            <select name="slippage_label" class="sf-select">
+              {% for s in slip_labels %}<option value="{{ s }}" {% if slippage_label==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Toggles -->
+      <div class="sf-section">
+        <div class="toggle-row">
+          <span class="toggle-label">WS Limit</span>
+          <label class="toggle">
+            <input type="checkbox" name="ws_limit_on" {% if ws_limit_on %}checked{% endif %}>
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+          <input class="sf-input mono" type="number" name="ws_limit" value="{{ ws_limit }}" min="1" max="50" style="width:52px;padding:4px 6px;font-size:11px">
+        </div>
+        <div class="toggle-row">
+          <span class="toggle-label">ATR Guard</span>
+          <label class="toggle">
+            <input type="checkbox" name="atr_guard_on" {% if atr_guard_on %}checked{% endif %}>
+            <div class="toggle-track"></div>
+            <div class="toggle-thumb"></div>
+          </label>
+          <input class="sf-input mono" type="number" name="atr_guard_multiplier" value="{{ atr_guard_multiplier }}" step="0.1" min="0.5" style="width:52px;padding:4px 6px;font-size:11px">
+        </div>
+      </div>
+
+      <!-- Price / ATR manual -->
+      <div class="sf-section">
+        <div class="sf-row">
+          <div class="sf-col">
+            <label class="sf-label">Price</label>
+            <input class="sf-input mono" type="number" name="price_val" id="priceInput" value="{{ price_val if price_val else '' }}" step="any" min="0" placeholder="Auto">
+          </div>
+          <div class="sf-col">
+            <label class="sf-label">ATR</label>
+            <input class="sf-input mono" type="number" name="atr_val" id="atrInput" value="{{ atr_val if atr_val else '' }}" step="any" min="0" placeholder="Auto">
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <button type="button" class="btn btn-dark btn-sm" style="flex:1" onclick="fetchLive()">↻ Fetch Live</button>
+          <button type="submit" class="sf-run-btn" style="margin-top:0;flex:1.2">Run ▶</button>
+        </div>
+      </div>
+    </form>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script>
+function setMarket(mt) {
+  document.getElementById('market_type_input').value = mt;
+  document.getElementById('sidebarForm').submit();
+}
+function fetchLive() {
+  const sym = document.getElementById('symbolSelect').value;
+  const mt  = document.getElementById('market_type_input').value;
+  const tf  = document.querySelector('[name=atr_tf]').value;
+  const per = document.querySelector('[name=atr_period]').value;
+  fetch(`/sim/api/price-atr?symbol=${sym}&atr_tf=${tf}&atr_period=${per}&market_type=${mt}`)
+    .then(r=>r.json()).then(d=>{
+      if(d.ok){
+        document.getElementById('priceInput').value = d.price;
+        document.getElementById('atrInput').value   = d.atr;
+      } else { alert('Error: '+d.error); }
+    });
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

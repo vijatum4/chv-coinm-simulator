@@ -1,0 +1,18 @@
+{% extends "simulator/base.html" %}
+{% block title %}Optimizer — CHV Sim{% endblock %}
+{% block head %}
+<style>
+.opt-empty{text-align:center;padding:48px;color:var(--muted)}
+.opt-empty .icon{font-size:40px;margin-bottom:12px}
+</style>
+{% endblock %}
+{% block content %}
+<h1 class="page-title">Optimizer <span>Parameter Search</span></h1>
+<div class="card">
+  <div class="opt-empty">
+    <div class="icon">⚙️</div>
+    <div style="font-size:15px;font-weight:600;color:var(--beige-dim);margin-bottom:8px">Optimizer Coming Soon</div>
+    <div style="font-size:13px;color:var(--muted)">Grid search over buffer × RR × lots parameter space with backtest scoring.</div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,71 @@
+{% extends "simulator/base.html" %}
+{% block title %}Guide — CHV Sim{% endblock %}
+{% block head %}
+<style>
+.guide-hero{background:linear-gradient(135deg,var(--olive-700),var(--olive-900));border:1px solid var(--line);border-radius:20px;padding:32px;margin-bottom:24px}
+.guide-hero h2{font-size:26px;font-weight:800;color:var(--green);margin-bottom:8px;letter-spacing:-0.03em}
+.guide-hero p{font-size:14px;color:var(--beige-dim);line-height:1.7;max-width:640px}
+.guide-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.guide-card{background:var(--olive-900);border:1px solid var(--line);border-radius:14px;padding:20px}
+.guide-card h3{font-size:14px;font-weight:700;color:var(--beige);margin-bottom:10px}
+.guide-card p,.guide-card li{font-size:13px;color:var(--beige-dim);line-height:1.7}
+.guide-card ul{padding-left:18px}
+.guide-card li{margin-bottom:4px}
+.step{display:flex;gap:12px;align-items:flex-start;margin-bottom:16px}
+.step-num{width:28px;height:28px;border-radius:8px;background:var(--olive-600);color:var(--green);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.step-body h4{font-size:13px;font-weight:700;color:var(--beige);margin-bottom:4px}
+.step-body p{font-size:12.5px;color:var(--beige-dim);line-height:1.6}
+.param-table{width:100%;border-collapse:collapse}
+.param-table th{text-align:left;padding:8px 10px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);border-bottom:1px solid var(--line)}
+.param-table td{padding:8px 10px;border-bottom:1px solid var(--line);font-size:12.5px;color:var(--beige-dim)}
+.param-table td:first-child{font-family:'JetBrains Mono',monospace;color:var(--green);font-size:12px}
+.param-table tr:last-child td{border-bottom:none}
+</style>
+{% endblock %}
+{% block content %}
+<div class="guide-hero">
+  <h2>CHV Recovery Trade Simulator</h2>
+  <p>A systematic simulator for the CHV (Cascading Hedge & Vindication) recovery trading strategy. Configure parameters, simulate individual cycles, run historical backtests, and export bot configs.</p>
+</div>
+
+<div class="guide-grid">
+  <div class="guide-card">
+    <h3>🔬 How CHV Works</h3>
+    <ul>
+      <li>Enter a long or short position with base lots</li>
+      <li>If price hits stop loss → <strong>whipsaw</strong>: re-enter with 1.5× lots at new level</li>
+      <li>If price hits take profit → cycle wins, P&L calculated</li>
+      <li>Cycle ends at take profit or when capital is exhausted</li>
+      <li>Capital compounds across cycles</li>
+    </ul>
+  </div>
+  <div class="guide-card">
+    <h3>⚙️ Key Parameters</h3>
+    <table class="param-table">
+      <tr><th>Param</th><th>Description</th></tr>
+      <tr><td>Buffer</td><td>ATR efficiency multiplier (0.5–1.0). Controls entry/stop width.</td></tr>
+      <tr><td>RR</td><td>Reward-to-risk ratio. 2.5 recommended for fee headroom.</td></tr>
+      <tr><td>Base Lots</td><td>Starting position size for each cycle.</td></tr>
+      <tr><td>Leverage</td><td>Exchange leverage. Affects margin, not P&L math.</td></tr>
+      <tr><td>ATR Period</td><td>ATR calculation window. 14 default.</td></tr>
+    </table>
+  </div>
+  <div class="guide-card">
+    <h3>📊 Quick Start</h3>
+    <div class="step"><div class="step-num">1</div><div class="step-body"><h4>Select Market</h4><p>Choose USDM (settle in USDT) or CoinM (settle in base coin). Select your asset.</p></div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-body"><h4>Set Parameters</h4><p>Configure buffer, RR, lots, leverage, and capital in the sidebar.</p></div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-body"><h4>Fetch Live</h4><p>Click "↻ Fetch Live" to auto-fill current price and ATR, or enter manually.</p></div></div>
+    <div class="step"><div class="step-num">4</div><div class="step-body"><h4>Run Backtest</h4><p>Go to Backtest tab, choose date range, and run. View results, charts and cycle log.</p></div></div>
+  </div>
+  <div class="guide-card">
+    <h3>💡 CoinM Notes</h3>
+    <ul>
+      <li>Contracts are priced in USD, settled in base coin</li>
+      <li>BTC: $100/contract · All others: $10/contract</li>
+      <li>P&L = lots × cs × (1/entry − 1/exit) in base coin</li>
+      <li>Capital shown in base coin (e.g. DOT, SOL, BTC)</li>
+      <li>RR ≥ 2.5 provides fee headroom over breakeven</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

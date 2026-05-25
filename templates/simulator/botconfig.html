@@ -1,40 +1,93 @@
 {% extends "simulator/base.html" %}
 {% block title %}Bot Config — CHV Sim{% endblock %}
-{% block head %}
-<style>
-.config-pre{background:var(--olive-900);border:1px solid var(--line);border-radius:12px;padding:20px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--beige-dim);overflow-x:auto;white-space:pre;line-height:1.6}
-</style>
-{% endblock %}
+
 {% block content %}
-<h1 class="page-title">Bot Config <span>Export Settings</span></h1>
+<div class="page-title">Bot Config <span>JSON Generator</span></div>
+
+{% if not price_val or price_val <= 0 %}
+<div class="alert alert-gold">⚠️ Fetch price + ATR from the sidebar first to generate a config.</div>
+{% endif %}
+
+{% if bc_error %}
+<div class="alert alert-red">❌ {{ bc_error }}</div>
+{% endif %}
+
+{% if params %}
 <div class="card" style="margin-bottom:16px">
-  <div style="font-size:13px;color:var(--beige-dim);margin-bottom:16px">Current sidebar parameters as bot config JSON. Copy this to deploy your CHV bot.</div>
-  <pre class="config-pre">{
-  "symbol":             "{{ symbol }}",
-  "market_type":        "{{ market_type }}",
-  "trading_tf":         "{{ trading_tf }}",
-  "atr_tf":             "{{ atr_tf }}",
-  "atr_period":         {{ atr_period }},
-  "efficiency_buffer":  {{ efficiency_buffer }},
-  "reward_ratio":       {{ reward_ratio }},
-  "base_lots":          {{ base_lots }},
-  "leverage":           {{ leverage }},
-  "capital":            {{ capital }},
-  "fee_rate_pct":       {{ fee_rate_pct }},
-  "ws_limit_on":        {{ 'true' if ws_limit_on else 'false' }},
-  "ws_limit":           {{ ws_limit }},
-  "atr_guard_on":       {{ 'true' if atr_guard_on else 'false' }},
-  "atr_guard_multiplier": {{ atr_guard_multiplier }},
-  "settle_coin":        "{{ settle_coin }}"
-}</pre>
+  <div class="card-head"><div class="card-title">Current Parameters</div></div>
+
+  <div class="card card-sm" style="margin-bottom:10px;border-color:
+    {% if params.safety_status=='SAFE' %}rgba(181,224,0,0.3)
+    {% elif params.safety_status=='CAUTION' %}rgba(250,221,86,0.3)
+    {% else %}rgba(200,50,30,0.4){% endif %}">
+    <span class="safety-{{ params.safety_status | lower }}">
+      {% if params.safety_status=='SAFE' %}✅{% elif params.safety_status=='CAUTION' %}⚠️{% else %}🚫{% endif %}
+      {{ params.safety_message }}
+    </span>
+  </div>
+
+  <div class="param-cards">
+    <div class="param-card"><div class="pc-lbl">LP (Entry)</div><div class="pc-val">{{ '%.4f'|format(params.lp) }}</div></div>
+    <div class="param-card"><div class="pc-lbl">SP (Stop)</div><div class="pc-val">{{ '%.4f'|format(params.sp) }}</div></div>
+    <div class="param-card"><div class="pc-lbl">TL (Long TP)</div><div class="pc-val">{{ '%.4f'|format(params.tl) }}</div></div>
+    <div class="param-card"><div class="pc-lbl">TS (Short TP)</div><div class="pc-val">{{ '%.4f'|format(params.ts) }}</div></div>
+    <div class="param-card"><div class="pc-lbl">c (step)</div><div class="pc-val">{{ '%.4f'|format(params.c) }}</div></div>
+    <div class="param-card"><div class="pc-lbl">d (reward)</div><div class="pc-val">{{ '%.4f'|format(params.d) }}</div></div>
+    <div class="param-card"><div class="pc-lbl">Footprint</div><div class="pc-val">{{ '%.4f'|format(params.footprint) }}</div></div>
+  </div>
 </div>
-<button class="btn btn-dark btn-sm" onclick="copyConfig()">📋 Copy JSON</button>
-{% endblock %}
-{% block scripts %}
-<script>
-function copyConfig() {
-  const txt = document.querySelector('.config-pre').textContent;
-  navigator.clipboard.writeText(txt).then(()=>alert('Copied!'));
-}
-</script>
+
+{% if params.is_safe %}
+<form method="POST" action="/sim/botconfig">
+  <input type="hidden" name="symbol" value="{{ symbol }}">
+  <input type="hidden" name="trading_tf" value="{{ trading_tf }}">
+  <input type="hidden" name="atr_tf" value="{{ atr_tf }}">
+  <input type="hidden" name="atr_period" value="{{ atr_period }}">
+  <input type="hidden" name="efficiency_buffer" value="{{ efficiency_buffer }}">
+  <input type="hidden" name="reward_ratio" value="{{ reward_ratio }}">
+  <input type="hidden" name="base_lots" value="{{ base_lots }}">
+  <input type="hidden" name="leverage" value="{{ leverage }}">
+  <input type="hidden" name="capital" value="{{ capital }}">
+  <input type="hidden" name="fee_rate_pct" value="{{ fee_rate_pct }}">
+  <input type="hidden" name="slippage_label" value="{{ slippage_label }}">
+  <input type="hidden" name="price_val" value="{{ price_val }}">
+  <input type="hidden" name="atr_val" value="{{ atr_val }}">
+  {% if atr_guard_on %}<input type="hidden" name="atr_guard_on" value="on">{% endif %}
+  <input type="hidden" name="atr_guard_multiplier" value="{{ atr_guard_multiplier }}">
+
+  <button type="submit" class="btn btn-green">⚙️ Generate Bot Config JSON</button>
+</form>
+{% else %}
+<div class="alert alert-red">🚫 Cannot generate config — ATR TRAP detected. Use different parameters.</div>
+{% endif %}
+{% endif %}
+
+{% if config_json %}
+<div class="card" style="margin-top:16px">
+  <div class="card-head">
+    <div class="card-title">Bot Configuration JSON</div>
+  </div>
+  <p style="font-size:12.5px;color:var(--muted);margin-bottom:10px">Copy this into your bot's config file. Fill in your API keys before going live.</p>
+  <pre style="background:var(--olive-900);border:1px solid var(--line);border-radius:10px;padding:16px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--beige)">{{ config_json }}</pre>
+
+  <div class="alert alert-gold" style="margin-top:12px">
+    <strong>Checklist before going live:</strong><br>
+    1. Fill in your API key and secret<br>
+    2. Set <code>testnet: false</code> only after validating on testnet<br>
+    3. Set <code>strategy.active: true</code> to enable execution<br>
+    4. Ensure Hedge Mode is enabled in Binance Futures settings<br>
+    5. Verify LP/SP/TL/TS match your current chart levels
+  </div>
+</div>
+{% endif %}
+
+{% if not params %}
+<div class="card">
+  <div class="empty-state">
+    <div class="es-icon">⚙️</div>
+    <div class="es-text">Fetch live price + ATR to generate config</div>
+    <div class="es-sub">Uses current sidebar parameters</div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

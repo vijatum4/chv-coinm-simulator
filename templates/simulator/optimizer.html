@@ -1,18 +1,133 @@
 {% extends "simulator/base.html" %}
 {% block title %}Optimizer — CHV Sim{% endblock %}
-{% block head %}
-<style>
-.opt-empty{text-align:center;padding:48px;color:var(--muted)}
-.opt-empty .icon{font-size:40px;margin-bottom:12px}
-</style>
-{% endblock %}
+
 {% block content %}
-<h1 class="page-title">Optimizer <span>Parameter Search</span></h1>
-<div class="card">
-  <div class="opt-empty">
-    <div class="icon">⚙️</div>
-    <div style="font-size:15px;font-weight:600;color:var(--beige-dim);margin-bottom:8px">Optimizer Coming Soon</div>
-    <div style="font-size:13px;color:var(--muted)">Grid search over buffer × RR × lots parameter space with backtest scoring.</div>
+<div class="page-title">Optimizer <span>Parameter Sweep</span></div>
+
+<form method="POST" action="/sim/optimizer">
+  <input type="hidden" name="action" value="optimize">
+  <input type="hidden" name="symbol" value="{{ symbol }}">
+  <input type="hidden" name="trading_tf" value="{{ trading_tf }}">
+  <input type="hidden" name="atr_tf" value="{{ atr_tf }}">
+  <input type="hidden" name="atr_period" value="{{ atr_period }}">
+  <input type="hidden" name="efficiency_buffer" value="{{ efficiency_buffer }}">
+  <input type="hidden" name="reward_ratio" value="{{ reward_ratio }}">
+  <input type="hidden" name="base_lots" value="{{ base_lots }}">
+  <input type="hidden" name="leverage" value="{{ leverage }}">
+  <input type="hidden" name="capital" value="{{ capital }}">
+  <input type="hidden" name="fee_rate_pct" value="{{ fee_rate_pct }}">
+  <input type="hidden" name="slippage_label" value="{{ slippage_label }}">
+  {% if ws_limit_on %}<input type="hidden" name="ws_limit_on" value="on">{% endif %}
+  <input type="hidden" name="ws_limit" value="{{ ws_limit }}">
+  {% if atr_guard_on %}<input type="hidden" name="atr_guard_on" value="on">{% endif %}
+  <input type="hidden" name="atr_guard_multiplier" value="{{ atr_guard_multiplier }}">
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-head"><div class="card-title">Sweep Ranges</div></div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
+      <div>
+        <label class="sf-field-label">Efficiency Buffers</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+          {% for b in buffer_choices %}
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--beige-dim);cursor:pointer">
+            <input type="checkbox" name="opt_buffers" value="{{ b }}"
+                   {% if b in [0.75,0.80,0.85,0.90] %}checked{% endif %}
+                   style="accent-color:var(--green)">
+            {{ b }}
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <label class="sf-field-label">Leverage Values</label>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+          {% for lev in [1, 2, 5, 10, 15, 20, 25, 50] %}
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--beige-dim);cursor:pointer">
+            <input type="checkbox" name="opt_leverages" value="{{ lev }}"
+                   {% if lev in [5,10,20,25] %}checked{% endif %}
+                   style="accent-color:var(--green)">
+            {{ lev }}×
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div>
+        <div class="sf-row">
+          <label class="sf-field-label">Base Lot Sizes (comma-separated)</label>
+          <input class="sf-input mono" type="text" name="opt_lots" value="1.0, 5.0, 10.0"
+                 placeholder="e.g. 1.0, 5.0, 10.0">
+        </div>
+        <div class="sf-row" style="margin-top:12px">
+          <label class="sf-field-label">Target Whipsaws to Survive</label>
+          <input class="sf-input mono" type="number" name="target_ws" value="5" min="1" max="30">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if not price_val or price_val <= 0 %}
+  <div class="alert alert-gold" style="margin-bottom:14px">⚠️ Fetch price + ATR from the sidebar first before running the optimizer.</div>
+  {% endif %}
+
+  <button type="submit" class="btn btn-green" {% if not price_val or price_val <= 0 %}disabled{% endif %}>
+    ▶ Run Optimizer
+  </button>
+</form>
+
+{% if opt_error %}
+<div class="alert alert-red" style="margin-top:14px">❌ {{ opt_error }}</div>
+{% endif %}
+
+{% if opt_rows %}
+<div class="section-head" style="margin-top:24px">
+  <h2>Results</h2>
+  <div class="section-sub">{{ opt_rows | length }} best setups</div>
+</div>
+
+<div class="card" style="padding:14px 14px 8px">
+  <div class="opt-scroll">
+    <table class="opt-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Buffer</th>
+          <th>Leverage</th>
+          <th>Base Lots</th>
+          <th>Net P&amp;L</th>
+          <th>Steps</th>
+          <th>Capital Safe</th>
+          <th>Footprint %</th>
+          <th>Status</th>
+          <th>Score</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in opt_rows %}
+        <tr {% if loop.first %}style="background:rgba(181,224,0,0.06)"{% endif %}>
+          <td style="color:var(--muted)">{{ loop.index }}</td>
+          <td>{{ row.buffer }}</td>
+          <td>{{ row.leverage }}×</td>
+          <td>{{ row.base_lots }}</td>
+          <td class="{% if row.net_pnl.startswith('+') or row.net_pnl.startswith('$') %}pl-pos{% else %}pl-neg{% endif %}">{{ row.net_pnl }}</td>
+          <td>{{ row.steps_covered }}</td>
+          <td>{{ '✅' if row.capital_safe else '❌' }}</td>
+          <td>{{ row.footprint_pct }}</td>
+          <td style="color:{% if row.status=='SAFE' %}var(--green){% elif row.status=='CAUTION' %}var(--gold){% else %}var(--neg){% endif %}">{{ row.status }}</td>
+          <td style="color:var(--sky)">{{ row.score }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
+{% elif not opt_error %}
+<div class="card" style="margin-top:16px">
+  <div class="empty-state">
+    <div class="es-icon">⚡</div>
+    <div class="es-text">Set ranges and click Run Optimizer</div>
+    <div class="es-sub">Sweeps buffer × leverage × lots combinations and ranks by score</div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

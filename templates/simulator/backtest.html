@@ -1,101 +1,43 @@
 {% extends "simulator/base.html" %}
-{% set COIN_NAMES = {
-  'SOL':'Solana','BTC':'Bitcoin','ETH':'Ethereum','BNB':'BNB','XRP':'XRP',
-  'ADA':'Cardano','DOT':'Polkadot','LINK':'Chainlink','LTC':'Litecoin',
-  'BCH':'Bitcoin Cash','DOGE':'Dogecoin','AVAX':'Avalanche',
-  'FARTCOIN':'Fartcoin','SUI':'Sui','NEAR':'NEAR','JUP':'Jupiter',
-  'JTO':'Jito','ONDO':'Ondo','XAU':'Gold'
-} %}
-{% set coin_full = COIN_NAMES.get(base_asset, base_asset) %}
-{% set mode_label = 'COINM' if market_type=='coinm' else 'USDM' %}
-{% set sym_unit   = settle_coin if (market_type=='coinm') else 'USDT' %}
+{% block title %}Backtest — CHV Sim{% endblock %}
 
-{% block title %}{{ mode_label }} · {{ coin_full }} Backtest — CHV Sim{% endblock %}
+{% block extra_js %}
+// ── Backtest polling ────────────────────────────────────────────────────────
+{% if bt_job_id and not result %}
+(function() {
+  var jobId = {{ bt_job_id | tojson }};
+  var prog = document.getElementById('btProgress');
+  var msg  = document.getElementById('btMsg');
+  var wrap = document.getElementById('btProgressWrap');
 
-{% block head %}
-<style>
-/* ── Stat cards ── */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px}
-.stat-card{background:var(--olive-900);border:1px solid var(--line);border-radius:14px;padding:16px}
-.stat-card.neg-card{border-color:oklch(0.45 0.12 28 / 0.6);background:var(--neg-bg)}
-.stat-label{font-size:10.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
-.stat-val{font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;letter-spacing:-0.03em;color:var(--beige);line-height:1}
-.stat-val.pos{color:var(--green)}
-.stat-val.neg{color:var(--neg)}
-.stat-sub{font-size:11px;color:var(--muted);margin-top:6px}
-
-/* ── Charts ── */
-.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
-.chart-card{background:var(--olive-900);border:1px solid var(--line);border-radius:14px;padding:16px}
-.chart-title{font-size:11.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:12px}
-.chart-svg{width:100%;display:block}
-
-/* ── WS breakdown table ── */
-.ws-table{width:100%;border-collapse:collapse;font-size:13px}
-.ws-table th{text-align:left;padding:8px 10px;font-size:10.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line)}
-.ws-table td{padding:8px 10px;border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:12.5px}
-.ws-table tr:last-child td{border-bottom:none}
-.dist-bar-bg{background:var(--olive-700);border-radius:4px;height:8px;overflow:hidden;min-width:80px}
-.dist-bar-fill{height:100%;border-radius:4px;background:var(--green)}
-.dist-bar-fill.warn{background:var(--gold)}
-.dist-bar-fill.neg{background:var(--neg)}
-
-/* ── Cycle log ── */
-.log-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
-.log-search{
-  flex:1;min-width:160px;max-width:320px;
-  padding:8px 12px;font-size:13px;font-family:'Inter Tight',sans-serif;
-  background:var(--olive-700);border:1px solid var(--line-strong);border-radius:8px;
-  color:var(--beige);outline:none;
-}
-.log-search:focus{border-color:var(--green)}
-.log-search::placeholder{color:var(--muted)}
-.log-table{width:100%;border-collapse:collapse;font-size:12.5px}
-.log-table th{text-align:left;padding:8px 8px;font-size:10.5px;font-weight:600;letter-spacing:0.05em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);white-space:nowrap}
-.log-table td{padding:8px 8px;border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:12px;vertical-align:middle;white-space:nowrap}
-.log-table tr:last-child td{border-bottom:none}
-.log-table tr:hover td{background:rgba(181,224,0,0.04)}
-.liq-row td{background:var(--neg-bg)!important}
-.ws-dot{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;font-size:11px;font-weight:700}
-.ws-dot.pos{background:rgba(181,224,0,0.12);color:var(--green)}
-.ws-dot.warn{background:rgba(250,221,86,0.12);color:var(--gold)}
-.ws-dot.neg{background:var(--neg-bg);color:var(--neg)}
-
-/* ── Progress bar ── */
-.progress-wrap{background:var(--olive-900);border:1px solid var(--line);border-radius:14px;padding:24px;margin-bottom:24px;text-align:center}
-.progress-bar-bg{background:var(--olive-700);border-radius:999px;height:8px;overflow:hidden;margin:12px 0}
-.progress-bar-fill{height:100%;background:var(--green);border-radius:999px;transition:width 0.4s}
-.progress-msg{font-size:13px;color:var(--muted)}
-
-/* ── Backtest form ── */
-.bt-form-row{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
-
-/* ── WIL stat card ── */
-.wil-sub{font-size:11px;color:var(--muted);margin-top:4px}
-
-/* ── Summary footer in WIL card ── */
-.stat-foot{font-size:11px;color:var(--muted);margin-top:6px;padding-top:6px;border-top:1px solid var(--line)}
-</style>
+  function poll() {
+    fetch('/sim/backtest/status/' + jobId)
+      .then(r => r.json())
+      .then(data => {
+        if (prog) prog.style.width = data.progress + '%';
+        if (msg)  msg.textContent  = data.msg;
+        if (data.status === 'done') {
+          window.location.href = '/sim/backtest/result/' + jobId;
+        } else if (data.status === 'error') {
+          if (wrap) wrap.innerHTML = '<div class="alert alert-red">❌ ' + data.msg + '</div>';
+        } else {
+          setTimeout(poll, 800);
+        }
+      })
+      .catch(() => setTimeout(poll, 2000));
+  }
+  poll();
+})();
+{% endif %}
 {% endblock %}
 
 {% block content %}
+<div class="page-title">Backtest <span>Historical Replay</span></div>
 
-<!-- Page title -->
-<div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:20px">
-  <h1 class="page-title" style="margin-bottom:0">
-    {% if result %}
-      {{ mode_label }} · {{ coin_full }} Backtest
-    {% else %}
-      Backtest
-    {% endif %}
-    <span>{{ base_asset }}/{{ sym_unit }}</span>
-  </h1>
-</div>
-
-<!-- Backtest run form -->
-<form method="POST" action="/sim/backtest" class="card card-sm" style="margin-bottom:20px">
+{# ─── Run form ─────────────────────────────────────────────────────────── #}
+<form method="POST" action="/sim/backtest" style="margin-bottom:18px">
   <input type="hidden" name="action" value="run">
-  <input type="hidden" name="market_type" value="{{ market_type }}">
+  {# preserve sidebar params #}
   <input type="hidden" name="symbol" value="{{ symbol }}">
   <input type="hidden" name="trading_tf" value="{{ trading_tf }}">
   <input type="hidden" name="atr_tf" value="{{ atr_tf }}">
@@ -111,333 +53,433 @@
   <input type="hidden" name="ws_limit" value="{{ ws_limit }}">
   {% if atr_guard_on %}<input type="hidden" name="atr_guard_on" value="on">{% endif %}
   <input type="hidden" name="atr_guard_multiplier" value="{{ atr_guard_multiplier }}">
-  <div class="bt-form-row">
-    <div style="display:flex;align-items:center;gap:8px">
-      <label style="font-size:12px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Period</label>
-      <select name="bt_days" class="sf-select" style="width:120px">
-        {% for d in [30,60,90,180,365] %}
-        <option value="{{ d }}" {% if bt_days==d %}selected{% endif %}>{{ d }} days</option>
+
+  <div class="card card-sm" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label class="sf-field-label">Lookback</label>
+      <select class="sf-input" name="bt_days" style="width:120px">
+        {% for d in [90,180,365,730] %}
+        <option value="{{ d }}" {% if d == bt_days %}selected{% endif %}>{{ d }}d</option>
         {% endfor %}
       </select>
     </div>
-    <button type="submit" class="btn btn-green">▶ Run Backtest</button>
-    {% if bt_error %}<span style="font-size:13px;color:var(--neg)">{{ bt_error }}</span>{% endif %}
+    <button type="submit" class="btn btn-green" style="align-self:flex-end">▶ Run Backtest</button>
+    {% if bt_error %}<span class="alert-red" style="font-size:13px;padding:6px 12px;border-radius:8px">❌ {{ bt_error }}</span>{% endif %}
   </div>
 </form>
 
-<!-- Progress (job running) -->
+{# ─── Progress ─────────────────────────────────────────────────────────── #}
 {% if bt_job_id and not result %}
-<div class="progress-wrap" id="progressWrap" data-job="{{ bt_job_id }}">
-  <div style="font-size:14px;font-weight:600;color:var(--beige)">Running backtest…</div>
-  <div class="progress-bar-bg"><div class="progress-bar-fill" id="progressFill" style="width:0%"></div></div>
-  <div class="progress-msg" id="progressMsg">Starting…</div>
+<div id="btProgressWrap" class="card card-sm">
+  <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:13px;font-weight:600;color:var(--beige)">Running backtest…</span>
+    <span id="btMsg" style="font-size:12px;color:var(--muted)">Queued…</span>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-bar" id="btProgress" style="width:0%"></div>
+  </div>
 </div>
 {% endif %}
 
+{# ─── Results ──────────────────────────────────────────────────────────── #}
 {% if result %}
-<!-- ── Stat cards ── -->
-{% set total = result.total_cycles %}
-{% set wins  = result.winning_cycles %}
-{% set wr    = (wins/total*100) if total else 0 %}
-{% set coinm = market_type == 'coinm' %}
+{% set total_cycles = result.total_cycles %}
+{% set winning = result.winning_cycles %}
+{% set win_rate = (winning / total_cycles * 100) | round(0) | int if total_cycles else 0 %}
+{% set growth_pct = growth_pct | default(0) %}
+{% set top6 = top6_ws | default([]) %}
+{% set bt_capital = bt_cap | default(capital) %}
 
-<div class="stat-grid">
-  <div class="stat-card">
-    <div class="stat-label">Total Cycles</div>
-    <div class="stat-val">{{ total }}</div>
-    <div class="stat-sub">{{ total_trades }} total trades</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Win Rate</div>
-    <div class="stat-val {% if wr>=50 %}pos{% else %}neg{% endif %}">{{ '%.1f'|format(wr) }}%</div>
-    <div class="stat-sub">{{ wins }} wins / {{ total - wins }} losses</div>
-  </div>
-  <div class="stat-card {% if result.total_net_pnl < 0 %}neg-card{% endif %}">
-    <div class="stat-label">Net P&L</div>
-    <div class="stat-val {% if result.total_net_pnl >= 0 %}pos{% else %}neg{% endif %}">
-      {% if coinm %}
-        {{ '%.4f'|format(result.total_net_pnl) }}
-      {% else %}
-        {% if result.total_net_pnl >= 0 %}+${{ '%.2f'|format(result.total_net_pnl) }}{% else %}-${{ '%.2f'|format(result.total_net_pnl|abs) }}{% endif %}
-      {% endif %}
+{# ── Hero: symbol + collapsible params strip ─────────────────────────── #}
+<section class="hero">
+  <div class="hero-top">
+    <div class="hero-left">
+      <div class="coin-badge">{{ symbol | replace('USDT','') | replace('BUSD','') | truncate(4,true,'') }}</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="hero-symbol">{{ symbol | replace('USDT','') | replace('BUSD','') }}</span>
+          <span class="hero-tag">BACKTEST</span>
+        </div>
+        <div class="hero-sub">
+          <b>{{ symbol }}</b> · {{ bt_days }}d lookback · {{ trading_tf }} / {{ atr_tf }} ATR · {{ total_cycles }} cycles
+        </div>
+      </div>
     </div>
-    <div class="stat-sub">{{ settle_coin if coinm else 'USDT' }}</div>
-  </div>
-  <div class="stat-card">
-    <div class="stat-label">Avg WS / Cycle</div>
-    <div class="stat-val">{{ '%.1f'|format(result.avg_whipsaws if result.avg_whipsaws is defined else (result.cycles|map(attribute='whipsaws')|sum / total if total else 0)) }}</div>
-    <div class="stat-sub">Max: {{ result.cycles|map(attribute='whipsaws')|max if result.cycles else 0 }}</div>
-  </div>
-  <div class="stat-card {% if result.worst_intra_loss < 0 %}neg-card{% endif %}">
-    <div class="stat-label">Worst Cycle Low</div>
-    <div class="stat-val mono neg" style="font-size:18px">
-      {% if coinm %}
-        {{ '%.4f'|format(result.worst_intra_loss) }}
-      {% else %}
-        {% if result.worst_intra_loss >= 0 %}+${{ '%.2f'|format(result.worst_intra_loss) }}{% else %}-${{ '%.2f'|format(result.worst_intra_loss|abs) }}{% endif %}
-      {% endif %}
+    <div class="hero-cta">
+      <button class="hero-btn hero-btn-dark" onclick="exportCsv({{ bt_job_id | tojson }})">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+        Export CSV
+      </button>
+      <button class="hero-btn hero-btn-ghost" id="paramsToggleBtn" onclick="toggleParams()">
+        <svg class="params-chevron" viewBox="0 0 24 24" width="16" height="16"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
     </div>
-    <div class="stat-sub">Cycle #{{ result.worst_intra_loss_cycle }}</div>
-    {% if wil_ns_cap and wil_ns_cap != '—' %}
-    <div class="stat-foot">Capital: {{ wil_ns_cap }}</div>
-    {% endif %}
   </div>
-  <div class="stat-card">
-    <div class="stat-label">Fee Used</div>
-    <div class="stat-val mono" style="font-size:18px">{{ fee_pct_used }}%</div>
-    <div class="stat-sub">{{ total_trades }} trades</div>
+  <div class="params-wrap" id="paramsWrap">
+    <div class="params">
+      <div class="param"><div class="lbl">Symbol</div><div class="val" style="font-size:13px">{{ symbol }}</div></div>
+      <div class="param"><div class="lbl">Trading TF</div><div class="val">{{ trading_tf }}</div></div>
+      <div class="param"><div class="lbl">ATR TF</div><div class="val">{{ atr_tf }}</div></div>
+      <div class="param"><div class="lbl">ATR Period</div><div class="val">{{ atr_period }}</div></div>
+      <div class="param"><div class="lbl">Buffer</div><div class="val">{{ efficiency_buffer }}</div></div>
+      <div class="param"><div class="lbl">Reward Ratio</div><div class="val">{{ reward_ratio }}</div></div>
+      <div class="param"><div class="lbl">Base Lots</div><div class="val">{{ base_lots }}</div></div>
+      <div class="param"><div class="lbl">Leverage</div><div class="val">{{ leverage }}×</div></div>
+      <div class="param capital"><div class="lbl">Capital</div><div class="val">{{ '{:,.0f}'.format(bt_capital) }}</div></div>
+    </div>
   </div>
-  {% if result.liquidated %}
-  <div class="stat-card neg-card">
-    <div class="stat-label">Liquidated</div>
-    <div class="stat-val neg" style="font-size:18px">💀 YES</div>
-    <div class="stat-sub">Capital depleted</div>
-  </div>
-  {% endif %}
+</section>
+
+{# ── Liquidation / completion banner ─────────────────────────────────── #}
+{% if result.liquidated %}
+<div class="alert alert-red">
+  💀 <strong>Account LIQUIDATED at Cycle {{ result.liquidation_cycle }}</strong> —
+  Whipsaw #{{ result.liquidation_step }}.
+  Reduce base lots, increase capital, or lower leverage to avoid margin blowout.
+</div>
+{% elif result.data_exhausted %}
+<div class="alert alert-green">
+  ✅ Backtest completed the full {{ bt_days }}-day period — capital held throughout all {{ total_cycles }} cycles.
+</div>
+{% endif %}
+
+{# ── Summary stat cards ──────────────────────────────────────────────── #}
+<div class="section-head">
+  <h2>Summary</h2>
+  <div class="section-sub">{{ '{:,}'.format(total_cycles) }} cycles · {{ '{:,}'.format(total_trades) }} trades</div>
 </div>
 
-<!-- ── Charts ── -->
-{% if bt_charts %}
-{% set ch = bt_charts %}
-<div class="chart-grid">
-  <!-- Equity Curve -->
-  <div class="chart-card">
-    <div class="chart-title">Equity Curve</div>
-    <svg class="chart-svg" viewBox="0 0 750 280" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="eq_grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#B5E000" stop-opacity="0.25"/>
-          <stop offset="100%" stop-color="#B5E000" stop-opacity="0"/>
-        </linearGradient>
-      </defs>
-      <!-- Y labels -->
-      {% for lbl in ch.eq_y_lbls %}
-      <line x1="38" y1="{{ lbl.y }}" x2="714" y2="{{ lbl.y }}" stroke="rgba(236,239,206,0.08)" stroke-width="1"/>
-      <text x="36" y="{{ lbl.y + 4 }}" fill="var(--muted)" font-size="10" text-anchor="end" font-family="JetBrains Mono">{{ lbl.label }}</text>
-      {% endfor %}
-      <!-- X labels -->
-      {% for lbl in ch.eq_x_lbls %}
-      <text x="{{ lbl.x }}" y="270" fill="var(--muted)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">{{ lbl.label }}</text>
-      {% endfor %}
-      <!-- Area -->
-      <path d="{{ ch.eq_area }}" fill="url(#eq_grad)"/>
-      <!-- Line -->
-      <path d="{{ ch.eq_line }}" fill="none" stroke="var(--green)" stroke-width="2"/>
-      <!-- Dot -->
-      <circle cx="{{ ch.eq_dot[0] }}" cy="{{ ch.eq_dot[1] }}" r="4" fill="var(--green)"/>
-    </svg>
+<div class="stat-grid">
+  <div class="stat">
+    <div class="stat-lbl">Total Cycles</div>
+    <div class="stat-val mono">{{ '{:,}'.format(total_cycles) }}</div>
+    <div class="stat-foot">{{ '{:,}'.format(total_trades) }} trades</div>
   </div>
 
-  <!-- Capital/Cycle -->
-  <div class="chart-card">
-    <div class="chart-title">Capital / Cycle</div>
-    <svg class="chart-svg" viewBox="0 0 750 280" xmlns="http://www.w3.org/2000/svg">
+  <div class="stat">
+    <div class="stat-lbl">Win Rate</div>
+    <div class="stat-val mono {% if win_rate >= 50 %}pos{% endif %}">{{ win_rate }}%</div>
+    <div class="stat-foot">{{ winning }}/{{ total_cycles }}</div>
+  </div>
+
+  <div class="stat featured">
+    <div class="stat-lbl">Total Net P&amp;L</div>
+    <div class="stat-val mono">
+      {% if result.total_net_pnl >= 0 %}+{% endif %}${{ '{:,.2f}'.format(result.total_net_pnl) }}
+    </div>
+    <div class="stat-foot">
+      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%+.1f'|format(growth_pct) }}% on ${{ '{:,.0f}'.format(bt_capital) }}
+    </div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-lbl">Avg Whipsaws / Cycle</div>
+    <div class="stat-val mono">{{ result.avg_whipsaws }}</div>
+    <div class="stat-foot muted-foot">top: {{ top6[0] if top6 else 0 }}</div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-lbl">Top 6 Max Whipsaws</div>
+    <div class="stat-val mono">{{ top6[0] if top6 else 0 }}</div>
+    <div class="stat-note">{{ top6[1:] | join(' · ') }}</div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-lbl">Worst Intra-Cycle Loss</div>
+    <div class="stat-val mono neg">-${{ '{:,.2f}'.format(result.worst_intra_loss | abs) }}</div>
+    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }}</div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-lbl">Total Fees Paid</div>
+    <div class="stat-val mono neg">-${{ '{:,.2f}'.format(result.total_fees | abs) }}</div>
+    <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }} trades</div>
+  </div>
+</div>
+
+{# ── Equity Curve + Whipsaw Breakdown ────────────────────────────────── #}
+{% set ch = bt_charts %}
+{% if ch %}
+<div class="split">
+
+  <!-- Equity Curve -->
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Equity Curve</div>
+        <div class="card-meta" style="margin-top:3px">Cumulative capital · {{ ch.eq_cycles }} cycles</div>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <span class="legend-dot sky">Net P&amp;L (USD)</span>
+      <span class="legend-dot green">Break-even</span>
+    </div>
+    <svg class="chart" viewBox="0 0 750 280" preserveAspectRatio="none" overflow="visible">
+      {% for lbl in ch.eq_y_lbls %}
+      <line class="grid-line" x1="40" y1="{{ lbl.y }}" x2="710" y2="{{ lbl.y }}"/>
+      {% endfor %}
+      <g class="axis-label">
+        {% for lbl in ch.eq_y_lbls %}
+        <text x="34" y="{{ lbl.y + 4 }}" text-anchor="end">{{ lbl.label }}</text>
+        {% endfor %}
+      </g>
+      <g class="axis-label">
+        {% for lbl in ch.eq_x_lbls %}
+        <text x="{{ lbl.x }}" y="265" text-anchor="middle">{{ lbl.label }}</text>
+        {% endfor %}
+      </g>
+      <text class="axis-title" x="375" y="280" text-anchor="middle">Cycle #</text>
       <defs>
-        <linearGradient id="cap_grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#7BC6F2" stop-opacity="0.25"/>
+        <linearGradient id="skyFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#7BC6F2" stop-opacity="0.30"/>
           <stop offset="100%" stop-color="#7BC6F2" stop-opacity="0"/>
         </linearGradient>
       </defs>
-      {% for lbl in ch.cap_y_lbls %}
-      <line x1="38" y1="{{ lbl.y }}" x2="714" y2="{{ lbl.y }}" stroke="rgba(236,239,206,0.08)" stroke-width="1"/>
-      <text x="36" y="{{ lbl.y + 4 }}" fill="var(--muted)" font-size="10" text-anchor="end" font-family="JetBrains Mono">{{ lbl.label }}</text>
-      {% endfor %}
-      {% for lbl in ch.cap_x_lbls %}
-      <text x="{{ lbl.x }}" y="270" fill="var(--muted)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">{{ lbl.label }}</text>
-      {% endfor %}
-      <path d="{{ ch.cap_area }}" fill="url(#cap_grad)"/>
-      <path d="{{ ch.cap_line }}" fill="none" stroke="var(--sky)" stroke-width="2"/>
+      <path d="{{ ch.eq_area }}" fill="url(#skyFill)"/>
+      <path d="{{ ch.eq_line }}" fill="none" stroke="#7BC6F2" stroke-width="2"/>
+      <line x1="40" y1="{{ ch.eq_zero_y }}" x2="710" y2="{{ ch.eq_zero_y }}"
+            stroke="#B5E000" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.55"/>
+      <!-- Breathing endpoint dot -->
+      <circle cx="{{ ch.eq_ep_x }}" cy="{{ ch.eq_ep_y }}" r="9" fill="#B5E000">
+        <animate attributeName="r" values="9;15;9" dur="2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+        <animate attributeName="fill-opacity" values="0.22;0;0.22" dur="2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+      </circle>
+      <circle cx="{{ ch.eq_ep_x }}" cy="{{ ch.eq_ep_y }}" r="4" fill="#B5E000"/>
     </svg>
   </div>
 
-  <!-- Capital/Trade -->
-  <div class="chart-card">
-    <div class="chart-title">Capital / Trade</div>
-    <svg class="chart-svg" viewBox="0 0 750 280" xmlns="http://www.w3.org/2000/svg">
+  <!-- Whipsaw Breakdown -->
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Whipsaw Breakdown</div>
+        <div class="card-meta" style="margin-top:3px">Cycles by whipsaw count</div>
+      </div>
+      <div style="display:flex;gap:12px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--beige-dim)">
+        <span>μ {{ result.avg_whipsaws }}</span>
+        <span style="width:4px;height:4px;border-radius:50%;background:var(--line-strong);align-self:center"></span>
+        <span>max {{ result.max_whipsaws }}</span>
+      </div>
+    </div>
+    {% if ws_breakdown %}
+    <div class="wh-table">
+      <div class="h">N</div>
+      <div class="h">Distribution</div>
+      <div class="h" style="text-align:right">%</div>
+      <div class="h" style="text-align:right">Σ%</div>
+      {% for row in ws_breakdown %}
+      <div class="wh-num {{ row.color }}">{{ row.n }}</div>
+      <div class="wh-bar-cell">
+        <div class="wh-bar {% if row.color != 'pos' %}{{ row.color }}{% endif %}" style="width:{{ row.bar_w }}%"></div>
+      </div>
+      <div class="wh-pct {{ row.color }}">{{ row.pct }}</div>
+      <div class="wh-cum">{{ row.cum }}</div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state"><div class="es-icon">📊</div><div class="es-text">No data</div></div>
+    {% endif %}
+  </div>
+</div>
+
+{# ── Capital per Cycle + Whipsaws per Cycle ──────────────────────────── #}
+<div class="bottom-row">
+
+  <!-- Capital per Cycle -->
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Capital per Cycle</div>
+        <div class="card-meta" style="margin-top:3px">Account balance after each cycle · {{ ch.cap_cycles }} cycles</div>
+      </div>
+      <div class="chart-legend" style="margin-bottom:0">
+        <span class="legend-dot gold">Capital (USD)</span>
+      </div>
+    </div>
+    <svg class="chart" viewBox="0 0 750 240" preserveAspectRatio="none">
+      {% for lbl in ch.cap_y_lbls %}
+      <line class="grid-line" x1="40" y1="{{ lbl.y }}" x2="710" y2="{{ lbl.y }}"/>
+      {% endfor %}
+      <g class="axis-label">
+        {% for lbl in ch.cap_y_lbls %}
+        <text x="34" y="{{ lbl.y + 4 }}" text-anchor="end">{{ lbl.label }}</text>
+        {% endfor %}
+      </g>
+      <g class="axis-label">
+        {% for lbl in ch.cap_x_lbls %}
+        <text x="{{ lbl.x }}" y="232" text-anchor="middle">{{ lbl.label }}</text>
+        {% endfor %}
+      </g>
       <defs>
-        <linearGradient id="ct_grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#FADD56" stop-opacity="0.20"/>
+        <linearGradient id="goldFill" x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stop-color="#FADD56" stop-opacity="0.28"/>
           <stop offset="100%" stop-color="#FADD56" stop-opacity="0"/>
         </linearGradient>
       </defs>
+      <path d="{{ ch.cap_area }}" fill="url(#goldFill)"/>
+      <path d="{{ ch.cap_line }}" fill="none" stroke="#FADD56" stroke-width="2"/>
+      <text class="axis-title" x="375" y="248" text-anchor="middle">Cycle #</text>
+    </svg>
+  </div>
+
+  <!-- Whipsaws per Cycle -->
+  <div class="card">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Whipsaws per Cycle</div>
+        <div class="card-meta" style="margin-top:3px">Distribution across {{ total_cycles }} cycles</div>
+      </div>
+      <div style="display:flex;gap:10px;font-size:11px">
+        <span style="color:var(--green)">● 0–2</span>
+        <span style="color:var(--gold)">● 3–5</span>
+        <span style="color:var(--neg)">● 6+</span>
+      </div>
+    </div>
+    <svg class="chart" viewBox="0 0 750 240" preserveAspectRatio="none">
+      {% for lbl in ch.ws_y_lbls %}
+      <line class="grid-line" x1="40" y1="{{ lbl.y }}" x2="710" y2="{{ lbl.y }}"/>
+      {% endfor %}
+      <g class="axis-label">
+        {% for lbl in ch.ws_y_lbls %}
+        <text x="34" y="{{ lbl.y + 4 }}" text-anchor="end">{{ lbl.label }}</text>
+        {% endfor %}
+      </g>
+      <g class="axis-label">
+        {% for lbl in ch.ws_x_lbls %}
+        <text x="{{ lbl.x }}" y="232" text-anchor="middle">{{ lbl.label }}</text>
+        {% endfor %}
+      </g>
+      <text class="axis-title" x="375" y="248" text-anchor="middle">Cycle #</text>
+      <g>{{ ch.ws_bars_svg | safe }}</g>
+    </svg>
+  </div>
+</div>
+
+{# ── Capital per Trade ────────────────────────────────────────────────── #}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head">
+    <div>
+      <div class="card-title">Capital per Trade</div>
+      <div class="card-meta" style="margin-top:3px">Balance after every filled order · {{ ch.ct_trades }} trades</div>
+    </div>
+    <div class="chart-legend" style="margin-bottom:0">
+      <span class="legend-dot gold">Capital (USD)</span>
+    </div>
+  </div>
+  <svg class="chart" viewBox="0 0 750 240" preserveAspectRatio="none">
+    {% for lbl in ch.ct_y_lbls %}
+    <line class="grid-line" x1="40" y1="{{ lbl.y }}" x2="710" y2="{{ lbl.y }}"/>
+    {% endfor %}
+    <g class="axis-label">
       {% for lbl in ch.ct_y_lbls %}
-      <line x1="38" y1="{{ lbl.y }}" x2="714" y2="{{ lbl.y }}" stroke="rgba(236,239,206,0.08)" stroke-width="1"/>
-      <text x="36" y="{{ lbl.y + 4 }}" fill="var(--muted)" font-size="10" text-anchor="end" font-family="JetBrains Mono">{{ lbl.label }}</text>
+      <text x="34" y="{{ lbl.y + 4 }}" text-anchor="end">{{ lbl.label }}</text>
       {% endfor %}
+    </g>
+    <g class="axis-label">
       {% for lbl in ch.ct_x_lbls %}
-      <text x="{{ lbl.x }}" y="270" fill="var(--muted)" font-size="10" text-anchor="middle" font-family="JetBrains Mono">{{ lbl.label }}</text>
+      <text x="{{ lbl.x }}" y="232" text-anchor="middle">{{ lbl.label }}</text>
       {% endfor %}
-      <path d="{{ ch.ct_area }}" fill="url(#ct_grad)"/>
-      <path d="{{ ch.ct_line }}" fill="none" stroke="var(--gold)" stroke-width="1.5"/>
-    </svg>
-  </div>
-
-  <!-- Whipsaws per cycle -->
-  <div class="chart-card">
-    <div class="chart-title">Whipsaws / Cycle</div>
-    <svg class="chart-svg" viewBox="0 0 750 280" xmlns="http://www.w3.org/2000/svg">
-      {% for bar in ch.ws_bars %}
-      {% set col = '#B5E000' if bar.color=='pos' else ('#FADD56' if bar.color=='warn' else 'oklch(0.66 0.18 28)') %}
-      <rect x="{{ bar.x }}" y="{{ 240 - bar.h }}" width="{{ bar.w }}" height="{{ bar.h }}"
-            fill="{{ col }}" opacity="0.7" rx="2"/>
-      {% if bar.ws > 0 and bar.w > 12 %}
-      <text x="{{ bar.x + bar.w/2 }}" y="{{ 240 - bar.h - 3 }}" fill="{{ col }}" font-size="9"
-            text-anchor="middle" font-family="JetBrains Mono">{{ bar.ws }}</text>
-      {% endif %}
-      {% endfor %}
-      <line x1="40" y1="240" x2="714" y2="240" stroke="var(--line-strong)" stroke-width="1"/>
-    </svg>
-  </div>
+    </g>
+    <defs>
+      <linearGradient id="goldFill2" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="#FADD56" stop-opacity="0.22"/>
+        <stop offset="100%" stop-color="#FADD56" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="{{ ch.ct_area }}" fill="url(#goldFill2)"/>
+    <path d="{{ ch.ct_line }}" fill="none" stroke="#FADD56" stroke-width="1.5"/>
+    <text class="axis-title" x="375" y="248" text-anchor="middle">Trade #</text>
+  </svg>
 </div>
 {% endif %}
 
-<!-- ── Whipsaw Breakdown ── -->
-{% if top6_ws %}
-{% set ws_counter = namespace() %}
-{% set sorted_ws = top6_ws %}
-<div class="card" style="margin-bottom:24px">
-  <div style="font-size:13px;font-weight:700;color:var(--beige);margin-bottom:14px">Top Whipsaws</div>
-  <!-- Build frequency table from bt_log -->
-  {% set ws_counts = namespace(data={}) %}
-  {% for row in bt_log %}
-    {% set n = row.ws %}
-    {% if n not in ws_counts.data %}
-      {% set _ = ws_counts.data.update({n: 0}) %}
-    {% endif %}
-    {% set _ = ws_counts.data.update({n: ws_counts.data[n] + 1}) %}
-  {% endfor %}
-  {% set ws_sorted = ws_counts.data.keys()|sort(reverse=True) %}
-  {% set tot = bt_log|length %}
-  {% set cum = namespace(val=0) %}
-  <table class="ws-table">
-    <thead>
-      <tr>
-        <th>N</th>
-        <th>Distribution</th>
-        <th>Cycles</th>
-        <th>%</th>
-        <th>Σ%</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for n in ws_sorted %}
-      {% set cnt = ws_counts.data[n] %}
-      {% set pct = (cnt/tot*100) if tot else 0 %}
-      {% set _ = cum.__setattr__('val', cum.val + pct) %}
-      {% set bar_color = 'pos' if n==0 else ('warn' if n<=5 else 'neg') %}
-      <tr>
-        <td><span class="ws-dot {{ bar_color }}">{{ n }}</span></td>
-        <td>
-          <div class="dist-bar-bg" style="width:120px">
-            <div class="dist-bar-fill {{ bar_color }}" style="width:{{ pct }}%"></div>
-          </div>
-        </td>
-        <td>{{ cnt }}</td>
-        <td>{{ '%.1f'|format(pct) }}%</td>
-        <td>{{ '%.1f'|format(cum.val) }}%</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
-
-<!-- ── Cycle Log ── -->
-{% if bt_log %}
-<div class="card">
-  <div class="log-controls">
-    <div style="font-size:13px;font-weight:700;color:var(--beige)">Cycle Log</div>
-    <input type="search" class="log-search" id="cycleSearch" placeholder="🔍  Search cycles…" oninput="filterCycleLog(this.value)">
-    <a href="/sim/backtest/download-csv?job_id={{ bt_job_id or '' }}" class="btn btn-dark btn-sm" download>⬇ Download CSV</a>
+{# ── Cycle Log ────────────────────────────────────────────────────────── #}
+<div class="section-head" style="margin-top:28px">
+  <h2>Cycle Log</h2>
+  <div class="section-sub">
+    Starting capital <strong style="color:var(--beige)">${{ '{:,.2f}'.format(bt_capital) }}</strong>
+    · {{ bt_log | length }} cycles
   </div>
-  <div style="overflow-x:auto">
-    <table class="log-table" id="cycleLogTable">
+</div>
+
+<div class="card" style="padding:14px 16px 8px">
+  <div class="toolbar">
+    <div class="search-wrap">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input placeholder="Filter by cycle #, exit, date…" id="searchInput" oninput="filterLog()">
+    </div>
+    <select class="filter-select" id="exitFilter" onchange="filterLog()">
+      <option value="">All cycles</option>
+      <option value="LONG_TP">Long TP</option>
+      <option value="SHORT_TP">Short TP</option>
+      <option value="ABORTED">Aborted</option>
+      <option value="LIQ">Liquidated</option>
+    </select>
+    <button class="btn btn-green" onclick="exportCsv({{ bt_job_id | tojson }})">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
+      CSV
+    </button>
+  </div>
+
+  <div class="log-scroll">
+    <table class="log-table" id="logTable">
       <thead>
         <tr>
-          <th>#</th>
-          <th>Capital</th>
-          <th>P&L</th>
-          <th>WS</th>
+          <th class="col-num">#</th>
+          <th>Capital After</th>
+          <th>P&amp;L</th>
           <th>Entry</th>
           <th>ATR</th>
           <th>LP</th>
           <th>SP</th>
-          <th>Worst Loss</th>
+          <th class="num">WS</th>
           <th>Duration</th>
+          <th>Worst Loss</th>
           <th>Exit</th>
-          <th>Start UTC</th>
-          <th>End UTC</th>
+          <th>Start</th>
+          <th>End</th>
         </tr>
       </thead>
-      <tbody>
-        {% for r in bt_log %}
-        <tr class="{% if r.liq %}liq-row{% endif %}">
-          <td>{{ r.num }}</td>
-          <td>{{ r.capital }}</td>
-          <td class="{% if r.pnl_pos %}pos{% else %}neg-val{% endif %}">{{ r.pnl_fmt }}</td>
-          <td><span class="ws-dot {{ r.ws_color }}">{{ r.ws }}</span></td>
-          <td>{{ r.entry }}</td>
-          <td>{{ r.atr }}</td>
-          <td>{{ r.lp }}</td>
-          <td>{{ r.sp }}</td>
-          <td class="{% if r.worst_neg %}neg-val{% endif %}">{{ r.worst }}</td>
-          <td>{{ r.dur }}</td>
-          <td>{{ r.exit }}</td>
-          <td style="color:var(--muted)">{{ r.start }}</td>
-          <td style="color:var(--muted)">{{ r.end }}</td>
+      <tbody id="logBody">
+        {% for row in bt_log %}
+        <tr data-exit="{{ row.exit }}">
+          <td class="col-num">{{ row.num }}</td>
+          <td>{{ row.capital }}</td>
+          <td class="{% if row.pnl_pos %}pl-pos{% else %}pl-neg{% endif %}">{{ row.pnl_fmt }}</td>
+          <td>{{ row.entry }}</td>
+          <td>{{ row.atr }}</td>
+          <td>{{ row.lp }}</td>
+          <td>{{ row.sp }}</td>
+          <td class="num" style="color:{% if row.ws==0 %}var(--green){% elif row.ws>=4 %}var(--gold){% else %}var(--beige){% endif %}">{{ row.ws }}</td>
+          <td style="color:var(--beige-dim)">{{ row.dur }}</td>
+          <td class="{% if row.worst_neg %}pl-neg{% endif %}">{{ row.worst }}</td>
+          <td>
+            <span class="pill {% if row.liq %}liq{% elif 'LONG' in row.exit %}long{% elif 'SHORT' in row.exit %}short{% else %}stopped{% endif %}">
+              {{ row.exit }}
+            </span>
+          </td>
+          <td style="color:var(--beige-dim)">{{ row.start }}</td>
+          <td style="color:var(--beige-dim)">{{ row.end }}</td>
         </tr>
+        {% else %}
+        <tr><td colspan="13" class="empty-state" style="padding:40px;text-align:center;color:var(--muted)">No cycles yet</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
-{% endif %}
 
-{% elif bt_job_id %}
-<!-- job polling handled by JS -->
 {% else %}
-<!-- No result yet -->
-<div class="card" style="text-align:center;padding:40px">
-  <div style="font-size:32px;margin-bottom:12px">📊</div>
-  <div style="font-size:15px;font-weight:600;color:var(--beige-dim)">Set parameters and run a backtest</div>
-  <div style="font-size:13px;color:var(--muted);margin-top:6px">Results will appear here</div>
+{# ── No result yet ────────────────────────────────────────────────────── #}
+{% if not bt_job_id %}
+<div class="card">
+  <div class="empty-state">
+    <div class="es-icon">📈</div>
+    <div class="es-text">Set parameters and click Run Backtest</div>
+    <div class="es-sub">Replays real Binance OHLCV data using your exact CHV parameters</div>
+  </div>
 </div>
 {% endif %}
-
-{% endblock %}
-
-{% block scripts %}
-<script>
-// ── Cycle log search ──
-function filterCycleLog(q) {
-  const rows = document.querySelectorAll('#cycleLogTable tbody tr');
-  const ql = q.toLowerCase();
-  rows.forEach(row => {
-    row.style.display = (!q || row.textContent.toLowerCase().includes(ql)) ? '' : 'none';
-  });
-}
-
-// ── Job polling ──
-{% if bt_job_id and not result %}
-(function poll() {
-  const jobId = '{{ bt_job_id }}';
-  fetch('/sim/backtest/status/' + jobId)
-    .then(r => r.json())
-    .then(d => {
-      const fill = document.getElementById('progressFill');
-      const msg  = document.getElementById('progressMsg');
-      if (fill) fill.style.width = d.progress + '%';
-      if (msg)  msg.textContent = d.msg || '';
-      if (d.status === 'done') {
-        window.location = '/sim/backtest/result/' + jobId;
-      } else if (d.status === 'error') {
-        if (msg) msg.textContent = '❌ ' + (d.msg || 'Error');
-      } else {
-        setTimeout(poll, 800);
-      }
-    })
-    .catch(() => setTimeout(poll, 2000));
-})();
 {% endif %}
-</script>
+
 {% endblock %}

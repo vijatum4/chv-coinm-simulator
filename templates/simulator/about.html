@@ -1,39 +1,108 @@
 {% extends "simulator/base.html" %}
 {% block title %}About — CHV Sim{% endblock %}
-{% block head %}
-<style>
-.about-section{background:var(--olive-900);border:1px solid var(--line);border-radius:14px;padding:24px;margin-bottom:16px}
-.about-section h3{font-size:14px;font-weight:700;color:var(--green);margin-bottom:10px}
-.about-section p,.about-section li{font-size:13px;color:var(--beige-dim);line-height:1.7}
-.about-section ul{padding-left:18px}
-.about-section li{margin-bottom:6px}
-.version-tag{display:inline-flex;align-items:center;gap:6px;background:var(--olive-700);border:1px solid var(--line-strong);border-radius:999px;padding:4px 12px;font-size:12px;color:var(--beige-dim);margin-bottom:20px}
-</style>
-{% endblock %}
+
 {% block content %}
-<h1 class="page-title">About</h1>
-<div class="version-tag">CHV Recovery Simulator · v2.0 · Flask 3.1</div>
+<div class="page-title">About <span>CHV Recovery Trade</span></div>
 
-<div class="about-section">
-  <h3>Strategy</h3>
-  <p>The CHV (Cascading Hedge & Vindication) Recovery strategy is a systematic approach to trading perpetual futures. It uses ATR-based entry/exit levels and a compounding lot-size recovery scheme to turn whipsaw sequences into profitable cycles over time.</p>
+<div class="guide-body">
+
+<div class="card" style="margin-bottom:16px">
+  <h2 style="margin-top:0">What is the CHV System?</h2>
+  <p>The <strong>CHV Recovery Trade</strong> is a structured hedging strategy built around a simple mathematical truth: if you know exactly how far price needs to move to hit your target, and you scale positions precisely, <strong>every cycle is guaranteed to recover — regardless of how many times price reverses.</strong></p>
+  <p>Most trading systems treat a stop-loss as a finalized loss. CHV treats it as an <strong>inversion signal</strong> — the moment price exits the bracket in the wrong direction, the position is flipped rather than closed.</p>
+  <div class="alert alert-green">
+    💡 <strong>Core idea:</strong> Let the market whipsaw. The math works in your favour every time price eventually trends.
+  </div>
 </div>
 
-<div class="about-section">
-  <h3>Engine</h3>
-  <ul>
-    <li><strong>USDM</strong> — Standard perpetual futures (e.g. SOLUSDT). P&L settled in USDT. Standard lot × price math.</li>
-    <li><strong>CoinM (Inverse)</strong> — Inverse perpetual futures (e.g. DOTUSD_PERP). Contracts priced in USD, settled in base coin. P&L = lots × cs × (1/entry − 1/exit).</li>
-    <li>Backtests pull historical klines from Binance REST API (dapi for CoinM, fapi for USDM).</li>
-    <li>ATR is calculated using Wilder's smoothed method over the configured period.</li>
-  </ul>
+<div class="card" style="margin-bottom:16px">
+  <h2 style="margin-top:0">The Price Bracket</h2>
+  <p>Every CHV cycle is anchored to <strong>four price levels</strong> derived from the current price and ATR:</p>
+  <table class="ref-table" style="margin:12px 0">
+    <thead><tr><th>Level</th><th>Name</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td>TL</td><td>Take Long</td><td>Long take-profit — price rises here to close a winning long</td></tr>
+      <tr><td>LP</td><td>Long Price</td><td>Long entry — initial long position opened here</td></tr>
+      <tr><td>SP</td><td>Short Price</td><td>Short entry / long stop-loss — crossing here triggers inversion</td></tr>
+      <tr><td>TS</td><td>Take Short</td><td>Short take-profit — price falls here to close a winning short</td></tr>
+    </tbody>
+  </table>
+  <pre><code>TL  ─────────────────────  ← Long TP        ( LP + d )
+LP  ─────────────────────  ← Long entry / Short SL
+SP  ─────────────────────  ← Short entry / Long SL   ( LP − c )
+TS  ─────────────────────  ← Short TP       ( SP − d )</code></pre>
+  <p>The bracket is <strong>symmetrical</strong> — <code>c</code> is the risk distance, <code>d</code> is the reward distance.</p>
 </div>
 
-<div class="about-section">
-  <h3>Infrastructure</h3>
-  <ul>
-    <li>Flask 3.1 · Python 3.12 · PM2 process <code style="font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--olive-700);padding:1px 5px;border-radius:4px">chv-simulator</code></li>
-    <li>Served at <code style="font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--olive-700);padding:1px 5px;border-radius:4px">port 8503</code> · Nginx proxy at <code style="font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--olive-700);padding:1px 5px;border-radius:4px">/sim/</code></li>
-  </ul>
+<div class="card" style="margin-bottom:16px">
+  <h2 style="margin-top:0">The Formula</h2>
+  <div class="formula-grid">
+    <div class="formula-card">
+      <h4>Bracket Sizing</h4>
+      <pre><code>c  =  (ATR × efficiency_buffer) / 3.0
+d  =  reward_ratio × c
+
+LP  =  entry_price
+SP  =  LP − c
+TL  =  LP + d
+TS  =  SP − d</code></pre>
+      <p style="font-size:12.5px;color:var(--beige-dim);margin-top:8px">
+        <strong style="color:var(--beige)">c</strong> — the cut-loss zone: width of one adverse move<br>
+        <strong style="color:var(--beige)">d</strong> — the recovery target: distance to take-profit<br>
+        Ratio <strong>2.0</strong> = mathematical breakeven (zero fees)<br>
+        Ratio <strong>2.5+</strong> = profit margin built in above breakeven
+      </p>
+    </div>
+    <div class="formula-card">
+      <h4>Lot Scaling on Inversion</h4>
+      <pre><code>1st inversion:  lots = base × 0.5
+2nd inversion:  lots = prev × 1.5
+3rd inversion:  lots = prev × 1.5
+       ⋮</code></pre>
+      <p style="font-size:12.5px;color:var(--beige-dim);margin-top:8px">
+        This is not a tuned parameter — it is the <strong style="color:var(--beige)">exact multiplier</strong> derived from the requirement that TP profit covers all accumulated losses plus the original target profit <code>d</code>.<br><br>
+        Solving gives <strong style="color:var(--green)">x = 1.5</strong> and first inversion factor <strong style="color:var(--green)">x − 1 = 0.5</strong>.
+      </p>
+    </div>
+  </div>
+  <div class="alert alert-green">
+    💡 <strong>Breakeven proof:</strong> With ratio = 2.0 and zero fees, any number of whipsaws nets exactly $0. Every unit of ratio above 2.0 converts into pure profit per cycle.
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h2 style="margin-top:0">What Makes CHV Different</h2>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+    <div class="formula-card">
+      <h4>🔄 No Realized Losses</h4>
+      <p style="font-size:12.5px;color:var(--beige-dim)">Traditional systems close losing positions. CHV inverts them. Every SL is an open hedge — the loss is unrealized until the TP recovers it, with profit.</p>
+    </div>
+    <div class="formula-card">
+      <h4>📐 Guaranteed Recovery</h4>
+      <p style="font-size:12.5px;color:var(--beige-dim)">The lot formula is derived, not tuned. As long as capital survives to the next TP, the cycle nets positive — not by luck, but by arithmetic.</p>
+    </div>
+    <div class="formula-card">
+      <h4>📊 ATR-Adaptive Bracket</h4>
+      <p style="font-size:12.5px;color:var(--beige-dim)">Bracket width scales with real volatility. Calm market = tight bracket. Volatile market = wider bracket. Structure stays proportional to actual price behaviour.</p>
+    </div>
+    <div class="formula-card">
+      <h4>↕️ Directional Neutrality</h4>
+      <p style="font-size:12.5px;color:var(--beige-dim)">Works identically long and short. Direction follows the market — after a long TP the next cycle opens long; after a short TP, opens short.</p>
+    </div>
+    <div class="formula-card">
+      <h4>⚖️ Single Risk Variable</h4>
+      <p style="font-size:12.5px;color:var(--beige-dim)">The only thing that ends a cycle badly is running out of capital to fund the next inversion. Direction, whipsaw count, and duration are all handled by the math.</p>
+    </div>
+    <div class="formula-card">
+      <h4>🛡️ Bounded Risk Option</h4>
+      <p style="font-size:12.5px;color:var(--beige-dim)">The optional whipsaw limit lets you cap exposure. Instead of risking a margin blowout, you take a controlled loss and re-enter on the next signal.</p>
+    </div>
+  </div>
+</div>
+
+<div style="text-align:center;padding:20px;color:var(--muted);font-size:12px">
+  CHV Recovery Trade Simulator · System Architect: Chitti Vijakkhana
+</div>
+
 </div>
 {% endblock %}

@@ -1,29 +1,10 @@
 {% extends "simulator/base.html" %}
 {% block title %}Simulator — CHV Sim{% endblock %}
-{% block head %}
-<style>
-.sim-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px}
-.sim-card{background:var(--olive-900);border:1px solid var(--line);border-radius:12px;padding:14px}
-.sim-label{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:6px}
-.sim-val{font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--beige)}
-.sim-val.pos{color:var(--green)}.sim-val.neg{color:var(--neg)}
-.sim-sub{font-size:11px;color:var(--muted);margin-top:4px}
-.steps-table{width:100%;border-collapse:collapse;font-size:12.5px}
-.steps-table th{padding:8px;text-align:left;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--muted);border-bottom:1px solid var(--line)}
-.steps-table td{padding:8px;border-bottom:1px solid var(--line);font-family:'JetBrains Mono',monospace;font-size:12px}
-.steps-table tr:last-child td{border-bottom:none}
-.params-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:20px}
-.param-card{background:var(--olive-900);border:1px solid var(--line);border-radius:10px;padding:12px}
-.param-card .lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);margin-bottom:4px}
-.param-card .val{font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--beige)}
-.safety-safe{color:var(--green)}.safety-caution{color:var(--gold)}.safety-trap{color:var(--neg)}
-</style>
-{% endblock %}
-{% block content %}
-<h1 class="page-title">Simulator <span>Single Cycle</span></h1>
 
-<form method="POST" action="/sim/simulator" style="margin-bottom:20px">
-  <input type="hidden" name="market_type" value="{{ market_type }}">
+{% block content %}
+<div class="page-title">Simulator <span>Single Cycle</span></div>
+
+<form method="POST" action="/sim/simulator">
   <input type="hidden" name="symbol" value="{{ symbol }}">
   <input type="hidden" name="trading_tf" value="{{ trading_tf }}">
   <input type="hidden" name="atr_tf" value="{{ atr_tf }}">
@@ -39,77 +20,105 @@
   <input type="hidden" name="ws_limit" value="{{ ws_limit }}">
   {% if atr_guard_on %}<input type="hidden" name="atr_guard_on" value="on">{% endif %}
   <input type="hidden" name="atr_guard_multiplier" value="{{ atr_guard_multiplier }}">
-  <div class="card card-sm" style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em">Price</label>
-      <input class="sf-input mono" type="number" name="price_val" value="{{ price_val or '' }}" step="any" placeholder="Required" style="width:140px">
+
+  <div class="card card-sm" style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:18px">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label class="sf-field-label">Price</label>
+      <input class="sf-input mono" type="number" name="price_val"
+             value="{{ price_val if price_val else '' }}" step="any" placeholder="Required" style="width:140px">
     </div>
-    <div style="display:flex;flex-direction:column;gap:4px">
-      <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.06em">ATR</label>
-      <input class="sf-input mono" type="number" name="atr_val" value="{{ atr_val or '' }}" step="any" placeholder="Required" style="width:140px">
+    <div style="display:flex;flex-direction:column;gap:3px">
+      <label class="sf-field-label">ATR</label>
+      <input class="sf-input mono" type="number" name="atr_val"
+             value="{{ atr_val if atr_val else '' }}" step="any" placeholder="Required" style="width:140px">
     </div>
     <button type="submit" class="btn btn-green">▶ Simulate</button>
-    {% if error %}<span style="font-size:13px;color:var(--neg)">❌ {{ error }}</span>{% endif %}
+    {% if error %}<span class="alert-red" style="padding:8px 12px;border-radius:8px;font-size:13px">❌ {{ error }}</span>{% endif %}
   </div>
 </form>
 
-{% if result %}
-{% set p = result.params %}
+{% if result and params %}
+{% set p = params %}
 
-<!-- Safety status -->
-<div class="card card-sm" style="margin-bottom:16px;border-color:{% if p.safety_status=='SAFE' %}rgba(181,224,0,0.3){% elif p.safety_status=='CAUTION' %}rgba(250,221,86,0.3){% else %}oklch(0.45 0.12 28 / 0.6){% endif %}">
-  <span class="safety-{{ p.safety_status|lower }}">
+{# ── Safety status ────────────────────────────────────────────────────── #}
+<div class="card card-sm" style="margin-bottom:14px;border-color:
+  {% if p.safety_status=='SAFE' %}rgba(181,224,0,0.3)
+  {% elif p.safety_status=='CAUTION' %}rgba(250,221,86,0.3)
+  {% else %}rgba(200,50,30,0.4){% endif %}">
+  <span class="safety-{{ p.safety_status | lower }}">
     {% if p.safety_status=='SAFE' %}✅{% elif p.safety_status=='CAUTION' %}⚠️{% else %}🚫{% endif %}
     {{ p.safety_message }}
   </span>
 </div>
 
-<!-- Params -->
-<div class="params-grid">
-  <div class="param-card"><div class="lbl">Entry (LP)</div><div class="val">{{ '%.4f'|format(p.lp) }}</div></div>
-  <div class="param-card"><div class="lbl">Stop (SP)</div><div class="val">{{ '%.4f'|format(p.sp) }}</div></div>
-  <div class="param-card"><div class="lbl">Take Profit</div><div class="val">{{ '%.4f'|format(p.tl) }}</div></div>
-  <div class="param-card"><div class="lbl">c (step)</div><div class="val">{{ '%.4f'|format(p.c) }}</div></div>
-  <div class="param-card"><div class="lbl">d (reward)</div><div class="val">{{ '%.4f'|format(p.d) }}</div></div>
-  <div class="param-card"><div class="lbl">Footprint</div><div class="val">{{ '%.4f'|format(p.footprint) }}</div></div>
+{# ── Param cards ──────────────────────────────────────────────────────── #}
+<div class="param-cards">
+  <div class="param-card"><div class="pc-lbl">Entry (LP)</div><div class="pc-val">{{ '%.4f'|format(p.lp) }}</div></div>
+  <div class="param-card"><div class="pc-lbl">Stop (SP)</div><div class="pc-val">{{ '%.4f'|format(p.sp) }}</div></div>
+  <div class="param-card"><div class="pc-lbl">Take Long (TL)</div><div class="pc-val">{{ '%.4f'|format(p.tl) }}</div></div>
+  <div class="param-card"><div class="pc-lbl">Take Short (TS)</div><div class="pc-val">{{ '%.4f'|format(p.ts) }}</div></div>
+  <div class="param-card"><div class="pc-lbl">c (step)</div><div class="pc-val">{{ '%.4f'|format(p.c) }}</div></div>
+  <div class="param-card"><div class="pc-lbl">d (reward)</div><div class="pc-val">{{ '%.4f'|format(p.d) }}</div></div>
+  <div class="param-card"><div class="pc-lbl">Footprint</div><div class="pc-val">{{ '%.4f'|format(p.footprint) }}</div></div>
+  <div class="param-card"><div class="pc-lbl">Footprint %</div><div class="pc-val">{{ '%.1f'|format(p.footprint_pct * 100) }}%</div></div>
 </div>
 
-<!-- Summary -->
-<div class="sim-grid">
+{# ── Summary cards ────────────────────────────────────────────────────── #}
+<div class="sim-summary">
   <div class="sim-card">
-    <div class="sim-label">Net P&L</div>
-    <div class="sim-val {% if result.net_pnl >= 0 %}pos{% else %}neg{% endif %}">
+    <div class="sc-lbl">Net P&amp;L</div>
+    <div class="sc-val {% if result.net_pnl >= 0 %}pos{% else %}neg{% endif %}">
       {{ '%+.4f'|format(result.net_pnl) }}
     </div>
-    <div class="sim-sub">{{ settle_coin }}</div>
+    <div class="sc-sub">after fees</div>
   </div>
   <div class="sim-card">
-    <div class="sim-label">Steps</div>
-    <div class="sim-val">{{ result.steps_covered }}</div>
-    <div class="sim-sub">Whipsaws: {{ result.steps_covered - 1 }}</div>
+    <div class="sc-lbl">Steps Covered</div>
+    <div class="sc-val">{{ result.steps_covered }}</div>
+    <div class="sc-sub">{{ result.steps_covered - 1 }} whipsaws</div>
   </div>
   <div class="sim-card">
-    <div class="sim-label">Resolved</div>
-    <div class="sim-val {% if result.resolved %}pos{% else %}neg{% endif %}">
+    <div class="sc-lbl">Resolved</div>
+    <div class="sc-val {% if result.resolved %}pos{% else %}neg{% endif %}">
       {{ '✅' if result.resolved else '❌' }}
     </div>
+    {% if result.resolved %}
+    <div class="sc-sub">step {{ result.resolution_step }}</div>
+    {% else %}
+    <div class="sc-sub" style="color:var(--neg)">capital runs out</div>
+    {% endif %}
   </div>
   <div class="sim-card">
-    <div class="sim-label">Capital OK</div>
-    <div class="sim-val {% if result.capital_survives %}pos{% else %}neg{% endif %}">
+    <div class="sc-lbl">Capital OK</div>
+    <div class="sc-val {% if result.capital_survives %}pos{% else %}neg{% endif %}">
       {{ '✅' if result.capital_survives else '💀' }}
     </div>
   </div>
   <div class="sim-card">
-    <div class="sim-label">Peak Margin</div>
-    <div class="sim-val mono" style="font-size:16px">{{ '%.2f'|format(result.peak_margin) }}</div>
-    <div class="sim-sub">Step {{ result.peak_margin_step }}</div>
+    <div class="sc-lbl">Peak Margin</div>
+    <div class="sc-val mono" style="font-size:17px">${{ '%.2f'|format(result.peak_margin) }}</div>
+    <div class="sc-sub">step {{ result.peak_margin_step }}</div>
   </div>
 </div>
 
-<!-- Steps table -->
+{% if not result.capital_survives %}
+<div class="alert alert-red" style="margin-bottom:14px">
+  💀 Capital runs out at step {{ result.danger_step }}
+  (${{ '%.2f'|format(result.danger_margin) }} needed, ${{ '%.2f'|format(capital) }} available).
+  Increase capital, reduce base lots, or lower leverage.
+</div>
+{% elif result.steps_covered < 5 %}
+<div class="alert alert-gold" style="margin-bottom:14px">
+  ⚠️ Capital sustains fewer than 5 whipsaws — consider adding more capital or reducing position size.
+</div>
+{% endif %}
+
+{# ── Steps table ──────────────────────────────────────────────────────── #}
 <div class="card">
-  <div style="font-size:13px;font-weight:700;color:var(--beige);margin-bottom:14px">Trade Steps</div>
+  <div class="card-head">
+    <div class="card-title">Whipsaw Ledger</div>
+    <div class="card-meta">{{ result.steps | length }} steps</div>
+  </div>
   <div style="overflow-x:auto">
     <table class="steps-table">
       <thead>
@@ -118,7 +127,7 @@
           <th>Direction</th>
           <th>Trigger Price</th>
           <th>Active Lots</th>
-          <th>Step P&L</th>
+          <th>Step P&amp;L</th>
           <th>Running Balance</th>
           <th>Margin Req</th>
           <th>Execution</th>
@@ -126,22 +135,25 @@
       </thead>
       <tbody>
         {% for s in result.steps %}
-        <tr>
+        <tr {% if result.danger_step and s.step == result.danger_step %}style="background:var(--neg-bg)"{% endif %}>
           <td>{{ s.step }}</td>
           <td>
-            <span style="color:{% if s.direction=='LONG' %}var(--green){% elif s.direction=='SHORT' %}var(--neg){% else %}var(--muted){% endif %}">
+            <span class="
+              {% if 'LONG' in s.direction and 'EXIT' not in s.direction %}dir-long
+              {% elif 'SHORT' in s.direction and 'EXIT' not in s.direction %}dir-short
+              {% else %}dir-exit{% endif %}">
               {{ s.direction }}
             </span>
           </td>
           <td>{{ '%.4f'|format(s.trigger_price) }}</td>
-          <td>{{ s.active_lots }}</td>
-          <td class="{% if s.closed_pnl >= 0 %}pos{% elif s.closed_pnl < 0 %}neg-val{% endif %}">
+          <td>{% if not s.is_exit %}{{ s.active_lots }}{% else %}—{% endif %}</td>
+          <td class="{% if s.closed_pnl > 0 %}pl-pos{% elif s.closed_pnl < 0 %}pl-neg{% endif %}">
             {{ '%+.4f'|format(s.closed_pnl) if s.closed_pnl != 0 else '—' }}
           </td>
-          <td class="{% if s.running_balance >= 0 %}pos{% elif s.running_balance < 0 %}neg-val{% endif %}">
+          <td class="{% if s.running_balance >= 0 %}pl-pos{% else %}pl-neg{% endif %}">
             {{ '%+.4f'|format(s.running_balance) }}
           </td>
-          <td>{{ '%.4f'|format(s.margin_required) }}</td>
+          <td>{% if not s.is_exit %}{{ '%.4f'|format(s.margin_required) }}{% else %}—{% endif %}</td>
           <td style="color:var(--muted);font-size:11px">{{ s.execution }}</td>
         </tr>
         {% endfor %}
@@ -151,10 +163,12 @@
 </div>
 
 {% else %}
-<div class="card" style="text-align:center;padding:40px">
-  <div style="font-size:32px;margin-bottom:12px">🔬</div>
-  <div style="font-size:15px;font-weight:600;color:var(--beige-dim)">Enter price and ATR to simulate a cycle</div>
-  <div style="font-size:13px;color:var(--muted);margin-top:6px">Uses current sidebar parameters</div>
+<div class="card">
+  <div class="empty-state">
+    <div class="es-icon">🔬</div>
+    <div class="es-text">Enter price and ATR to simulate a cycle</div>
+    <div class="es-sub">Uses current sidebar parameters</div>
+  </div>
 </div>
 {% endif %}
 {% endblock %}

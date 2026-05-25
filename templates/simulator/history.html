@@ -1,74 +1,79 @@
 {% extends "simulator/base.html" %}
 {% block title %}History — CHV Sim{% endblock %}
-{% block head %}
-<style>
-.hist-table{width:100%;border-collapse:collapse;font-size:12.5px}
-.hist-table th{padding:9px 10px;text-align:left;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted);border-bottom:1px solid var(--line)}
-.hist-table td{padding:9px 10px;border-bottom:1px solid var(--line);color:var(--beige-dim)}
-.hist-table td:first-child{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--beige)}
-.hist-table tr:last-child td{border-bottom:none}
-.hist-table tr:hover td{background:rgba(181,224,0,0.03)}
-.hist-actions{display:flex;gap:6px;align-items:center}
-</style>
-{% endblock %}
+
 {% block content %}
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:8px">
-  <h1 class="page-title" style="margin-bottom:0">Backtest History</h1>
-  {% if entries %}
-  <form method="POST" action="/sim/history/clear" onsubmit="return confirm('Clear all backtest files?')">
-    <button type="submit" class="btn btn-dark btn-sm" style="color:var(--neg)">🗑 Clear All</button>
-  </form>
-  {% endif %}
-</div>
+<div class="page-title">History <span>Saved Backtests</span></div>
 
 {% if entries %}
-<div class="card" style="overflow-x:auto">
-  <table class="hist-table">
-    <thead>
-      <tr>
-        <th>File</th>
-        <th>Symbol</th>
-        <th>Cycles</th>
-        <th>Net P&L</th>
-        <th>Size</th>
-        <th>Saved</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for e in entries %}
-      <tr>
-        <td>{{ e.name }}</td>
-        <td>{{ e.symbol or '—' }}</td>
-        <td>{{ e.total_cycles or '—' }}</td>
-        <td>
-          {% if e.total_net_pnl is defined and e.total_net_pnl is not none %}
-            <span class="{% if e.total_net_pnl >= 0 %}pos{% else %}neg-val{% endif %}">
-              {{ '%+.4f'|format(e.total_net_pnl) }}
-            </span>
-          {% else %}—{% endif %}
-        </td>
-        <td>{{ (e.size / 1024)|round(1) }} KB</td>
-        <td style="color:var(--muted);font-size:11px">{{ (e.saved_utc or '')[:16] }}</td>
-        <td>
-          <div class="hist-actions">
-            <a href="/sim/history/download/{{ e.name }}" class="btn btn-dark btn-sm" download>⬇</a>
-            <form method="POST" action="/sim/history/delete" style="margin:0" onsubmit="return confirm('Delete {{ e.name }}?')">
-              <input type="hidden" name="filename" value="{{ e.name }}">
-              <button type="submit" class="btn btn-dark btn-sm" style="color:var(--neg)">✕</button>
-            </form>
-          </div>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+<div class="section-head">
+  <h2>Saved Backtests</h2>
+  <div class="section-sub">{{ entries | length }} file(s) on server</div>
 </div>
+
+<div class="card" style="padding:14px 14px 8px">
+  <div style="overflow-x:auto">
+    <table class="hist-table">
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Lookback</th>
+          <th>TF</th>
+          <th>Capital</th>
+          <th>Leverage</th>
+          <th>Cycles</th>
+          <th>Net P&amp;L</th>
+          <th>Liquidated</th>
+          <th>Saved</th>
+          <th>Size</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr>
+          <td style="color:var(--green);font-weight:600">{{ e.symbol }}</td>
+          <td>{{ e.lookback }}</td>
+          <td>{{ e.trading_tf }}</td>
+          <td>{{ e.capital }}</td>
+          <td>{{ e.leverage }}</td>
+          <td>{{ e.cycles }}</td>
+          <td class="{% if e.net_pnl and e.net_pnl.startswith('+') %}pl-pos{% elif e.net_pnl and e.net_pnl.startswith('-') %}pl-neg{% endif %}">{{ e.net_pnl }}</td>
+          <td>{% if e.liquidated %}<span class="pill liq">LIQ</span>{% else %}<span class="pill long">OK</span>{% endif %}</td>
+          <td style="color:var(--beige-dim);font-size:11px">{{ e.saved }}</td>
+          <td style="color:var(--muted)">{{ e.size_kb }} KB</td>
+          <td style="text-align:right">
+            <div style="display:flex;gap:6px;justify-content:flex-end">
+              <a href="/sim/history/download/{{ e.name }}" class="btn btn-outline" style="font-size:11px;padding:5px 10px">⬇</a>
+              <form method="POST" action="/sim/history/delete" style="margin:0">
+                <input type="hidden" name="filename" value="{{ e.name }}">
+                <button type="submit" class="btn btn-outline" style="font-size:11px;padding:5px 10px;color:var(--neg)"
+                        onclick="return confirm('Delete {{ e.name }}?')">🗑</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div style="margin-top:16px">
+  <form method="POST" action="/sim/history/clear"
+        onsubmit="return confirm('Delete all {{ entries | length }} backtest files? This cannot be undone.')">
+    <button type="submit" class="btn btn-outline" style="color:var(--neg);border-color:rgba(200,50,30,0.3)">
+      🗑 Clear All ({{ entries | length }} files)
+    </button>
+  </form>
+</div>
+
 {% else %}
-<div class="card" style="text-align:center;padding:48px">
-  <div style="font-size:40px;margin-bottom:12px">📁</div>
-  <div style="font-size:15px;font-weight:600;color:var(--beige-dim);margin-bottom:8px">No backtest files yet</div>
-  <div style="font-size:13px;color:var(--muted)">Run a backtest and results will be saved here.</div>
+<div class="card">
+  <div class="empty-state">
+    <div class="es-icon">📂</div>
+    <div class="es-text">No backtest history yet</div>
+    <div class="es-sub">Run a backtest and it will be auto-saved here</div>
+  </div>
 </div>
 {% endif %}
 {% endblock %}

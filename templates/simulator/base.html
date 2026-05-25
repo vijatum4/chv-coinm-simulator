@@ -274,6 +274,7 @@ select.sf-input{cursor:pointer;-webkit-appearance:none;appearance:none;
   align-self:end;font-size:11px;color:var(--muted);
   font-family:'JetBrains Mono',monospace;
 }
+.lots-hint{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:3px;padding:0 4px}
 
 /* ── 2-col split ────────────────────────────────────────── */
 .split{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px}
@@ -711,9 +712,16 @@ input[type=range].sf-range::-moz-range-track{
 
         <div class="sf-row">
           <label class="sf-field-label" id="baseLotsLabel">Base Lots ({{ base_asset }})</label>
-          <input class="sf-input mono" type="number" name="base_lots" value="{{ base_lots }}"
-                 step="{{ lot_step }}" min="{{ lot_min }}">
+          <input class="sf-input mono" type="number" name="base_lots" id="baseLotsInput"
+                 value="{{ base_lots }}" step="{{ lot_step }}" min="{{ lot_min }}"
+                 oninput="updateLotsHint(document.getElementById('marketTypeInput')?.value||'USDM',document.getElementById('symbolSelect')?.value||'',this.value)">
         </div>
+        {% if market_type == 'COINM' %}
+          {% set _csize = 100 if base_asset == 'BTC' else 10 %}
+          <div id="lotsHint" class="lots-hint">{{ base_lots | int }} × ${{ _csize }} = ${{ (base_lots * _csize) | int }} USD notional</div>
+        {% else %}
+          <div id="lotsHint" class="lots-hint" style="display:none"></div>
+        {% endif %}
 
         <div class="sf-slider-row">
           <div class="sf-slider-head">
@@ -809,12 +817,26 @@ function getBaseAsset(symbol, marketVal) {
   return symbol.replace('USDT', '').replace('BUSD', '');
 }
 
+function updateLotsHint(marketVal, symbolVal, lotsVal) {
+  const hint = document.getElementById('lotsHint');
+  if (!hint) return;
+  if (marketVal !== 'COINM') { hint.style.display = 'none'; return; }
+  const base = getBaseAsset(symbolVal || '', marketVal);
+  const cSize = base === 'BTC' ? 100 : 10;
+  const n = parseFloat(lotsVal) || 0;
+  const total = Math.round(n * cSize * 100) / 100;
+  hint.textContent = `${n} × $${cSize} = $${total} USD notional`;
+  hint.style.display = '';
+}
+
 function updateAssetLabels(marketVal, symbolVal) {
   const base = getBaseAsset(symbolVal || '', marketVal);
   const capLbl = document.getElementById('capitalLabel');
   if (capLbl) capLbl.textContent = marketVal === 'COINM' ? `Capital (${base})` : 'Capital (USD)';
   const lotsLbl = document.getElementById('baseLotsLabel');
   if (lotsLbl) lotsLbl.textContent = `Base Lots (${base})`;
+  const lotsInp = document.getElementById('baseLotsInput');
+  updateLotsHint(marketVal, symbolVal, lotsInp ? lotsInp.value : 0);
 }
 
 function setMarket(val) {

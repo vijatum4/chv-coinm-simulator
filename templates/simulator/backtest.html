@@ -490,14 +490,14 @@
         <tr data-exit="{{ row.exit }}">
           <td class="col-num">{{ row.num }}</td>
           <td>{{ row.capital }}</td>
-          <td class="{% if row.pnl_pos %}pl-pos{% else %}pl-neg{% endif %}">{{ row.pnl_fmt }}</td>
+          <td class="{% if row.pnl_zero %}{% elif row.pnl_pos %}pl-pos{% else %}pl-neg{% endif %}">{{ row.pnl_fmt }}</td>
           <td>{{ row.entry }}</td>
           <td>{{ row.atr }}</td>
           <td>{{ row.lp }}</td>
           <td>{{ row.sp }}</td>
           <td class="num" style="color:{% if row.ws==0 %}var(--green){% elif row.ws>=4 %}var(--gold){% else %}var(--beige){% endif %}">{{ row.ws }}</td>
           <td style="color:var(--beige-dim)">{{ row.dur }}</td>
-          <td class="{% if row.worst_neg %}pl-neg{% endif %}">{{ row.worst }}</td>
+          <td class="{% if row.worst_zero %}{% elif row.worst_neg %}pl-neg{% else %}pl-pos{% endif %}">{{ row.worst }}</td>
           <td>
             <span class="pill {% if row.liq %}liq{% elif 'LONG' in row.exit %}long{% elif 'SHORT' in row.exit %}short{% else %}stopped{% endif %}">
               {{ row.exit_display }}

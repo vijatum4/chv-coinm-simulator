@@ -233,7 +233,7 @@
   <div class="stat">
     <div class="stat-lbl">Total Fees Paid</div>
     <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.total_fees | abs) }}</div>
-    <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }} trades</div>
+    <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }}t</div>
   </div>
 
 </div>
@@ -460,7 +460,7 @@
       <option value="ABORTED">Aborted</option>
       <option value="LIQ">Liquidated</option>
     </select>
-    <button class="btn btn-green" onclick="exportCsv({{ bt_job_id | tojson }})">
+    <button class="btn btn-green" onclick="exportCsv()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
       CSV
     </button>

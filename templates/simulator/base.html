@@ -332,6 +332,8 @@ svg.chart{width:100%;display:block}
   position:sticky;top:0;background:var(--olive-700);z-index:1;
 }
 .log-table td{padding:9px 10px;border-bottom:1px solid rgba(236,239,206,0.05);color:var(--beige)}
+.log-table td.pl-pos{color:var(--green);font-weight:600}
+.log-table td.pl-neg{color:var(--neg);font-weight:600}
 .log-table tr:hover td{background:rgba(236,239,206,0.03)}
 .log-table .col-num{color:var(--muted);text-align:right;width:32px}
 .log-table .num{text-align:right}
@@ -963,9 +965,29 @@ function filterLog() {
   });
 }
 
-// Export CSV
-function exportCsv(jobId) {
-  window.location.href = `/sim/backtest/download-csv/${jobId}`;
+// Export CSV — client-side from table DOM
+function exportCsv() {
+  var table = document.getElementById('logTable');
+  if (!table) return;
+  var rows = [];
+  table.querySelectorAll('thead tr').forEach(function(tr) {
+    rows.push(Array.from(tr.querySelectorAll('th')).map(function(th) {
+      return '"' + th.textContent.trim().replace(/"/g, '""') + '"';
+    }).join(','));
+  });
+  table.querySelectorAll('tbody tr').forEach(function(tr) {
+    if (tr.style.display === 'none') return;
+    rows.push(Array.from(tr.querySelectorAll('td')).map(function(td) {
+      return '"' + td.textContent.trim().replace(/"/g, '""') + '"';
+    }).join(','));
+  });
+  var blob = new Blob([rows.join('\n')], {type: 'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'chv_backtest.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 {% block extra_js %}{% endblock %}

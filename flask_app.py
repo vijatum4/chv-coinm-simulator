@@ -604,9 +604,8 @@ def bt_result_view(job_id):
 
     total_trades = sum(len(c.steps) for c in result.cycles)
     growth_pct = (result.total_net_pnl / bt_cap * 100) if bt_cap else 0
-    # Deduplicated top whipsaw values, sorted descending (for display badges)
     all_ws_sorted = sorted([c.whipsaws for c in result.cycles], reverse=True)
-    top6_ws = list(dict.fromkeys(all_ws_sorted))[:7]  # up to 7 unique values
+    top6_ws = all_ws_sorted[:6]  # top 6 with duplicates allowed
     ws_breakdown = _build_ws_breakdown(result)
 
     # capital at worst_intra_loss_cycle

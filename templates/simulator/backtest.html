@@ -53,6 +53,7 @@
 {# ─── Run form ─────────────────────────────────────────────────────────── #}
 <form method="POST" action="/sim/backtest" style="margin-bottom:18px">
   <input type="hidden" name="action" value="run">
+  <input type="hidden" name="market_type" value="{{ market_type }}">
   <input type="hidden" name="symbol" value="{{ symbol }}">
   <input type="hidden" name="trading_tf" value="{{ trading_tf }}">
   <input type="hidden" name="atr_tf" value="{{ atr_tf }}">

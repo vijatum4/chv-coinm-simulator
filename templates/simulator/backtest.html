@@ -486,7 +486,7 @@
         </tr>
       </thead>
       <tbody id="logBody">
-        {% for row in bt_log %}
+        {% for row in bt_log | reverse %}
         <tr data-exit="{{ row.exit }}">
           <td class="col-num">{{ row.num }}</td>
           <td>{{ row.capital }}</td>

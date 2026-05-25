@@ -628,7 +628,7 @@ input[type=range].sf-range::-moz-range-track{
               <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
               {% endfor %}
             {% else %}
-              {% for sym in ['SOLUSDT','BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','FARTCOINUSDT','SUIUSDT','DOGEUSDT','AVAXUSDT','NEARUSDT','ONDOUSDT','JUPUSDT','JTOUSDT','XAUUSDT'] %}
+              {% for sym in ['SOLUSDT','BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','FARTCOINUSDT','SUIUSDT','DOGEUSDT','AVAXUSDT','NEARUSDT','ONDOUSDT','ORDIUSDT','JUPUSDT','JTOUSDT','XAUUSDT'] %}
               <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
               {% endfor %}
             {% endif %}
@@ -799,7 +799,8 @@ const TF_RULE = {{ tf_rule | tojson }};
 // USDM / COINM symbol lists (for client-side tab switching)
 const MARKET_SYMBOLS = {
   'USDM': ['SOLUSDT','BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','FARTCOINUSDT',
-           'SUIUSDT','DOGEUSDT','AVAXUSDT','NEARUSDT','ONDOUSDT','JUPUSDT','JTOUSDT','XAUUSDT'],
+           'SUIUSDT','DOGEUSDT','AVAXUSDT','NEARUSDT','ONDOUSDT','ORDIUSDT',
+           'JUPUSDT','JTOUSDT','XAUUSDT'],
   'COINM': {{ coinm_symbols | tojson }},
 };
 

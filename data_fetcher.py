@@ -211,7 +211,7 @@ def get_available_symbols(limit: int = 50) -> list:
     PRIORITY = [
         "AVAXUSDT", "BNBUSDT", "BTCUSDT", "DOGEUSDT", "ETHUSDT",
         "FARTCOINUSDT", "JTOUSDT", "JUPUSDT", "NEARUSDT", "ONDOUSDT",
-        "SOLUSDT", "SUIUSDT", "XAUUSDT", "XRPUSDT",
+        "ORDIUSDT", "SOLUSDT", "SUIUSDT", "XAUUSDT", "XRPUSDT",
     ]
     FALLBACK = sorted(PRIORITY)  # used if API is unreachable
 
@@ -233,7 +233,7 @@ def get_available_symbols(limit: int = 50) -> list:
 _COINM_SYMBOLS = [
     'BTCUSD_PERP', 'ETHUSD_PERP', 'BNBUSD_PERP', 'XRPUSD_PERP',
     'ADAUSD_PERP', 'SOLUSD_PERP', 'DOTUSD_PERP', 'LINKUSD_PERP',
-    'LTCUSD_PERP', 'BCHUSD_PERP',
+    'LTCUSD_PERP', 'BCHUSD_PERP', 'ORDIUSD_PERP',
 ]
 
 def get_coinm_symbols() -> list:

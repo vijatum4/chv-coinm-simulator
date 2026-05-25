@@ -1,6 +1,22 @@
 {% extends "simulator/base.html" %}
 {% block title %}Backtest — CHV Sim{% endblock %}
 
+{% block extra_css %}
+/* Negative P&L featured card */
+.stat.featured.neg-pnl {
+  background: linear-gradient(155deg, oklch(0.42 0.17 28) 0%, oklch(0.32 0.14 28) 100%);
+}
+.stat.featured.neg-pnl .stat-lbl { color: rgba(255,200,180,0.60) }
+.stat.featured.neg-pnl .stat-val { color: #fff8f6 }
+.stat.featured.neg-pnl .stat-foot { background: rgba(0,0,0,0.20); color: rgba(255,190,170,0.90) }
+
+/* Whipsaw breakdown: N + Distribution + Count + % + Σ% */
+.wh-table { grid-template-columns: 28px 1fr 44px 60px 60px }
+
+/* Toolbar: match button height to search/filter */
+.toolbar .btn { padding-top: 7px; padding-bottom: 7px; border-radius: 10px }
+{% endblock %}
+
 {% block extra_js %}
 // ── Backtest polling ────────────────────────────────────────────────────────
 {% if bt_job_id and not result %}
@@ -37,7 +53,6 @@
 {# ─── Run form ─────────────────────────────────────────────────────────── #}
 <form method="POST" action="/sim/backtest" style="margin-bottom:18px">
   <input type="hidden" name="action" value="run">
-  {# preserve sidebar params #}
   <input type="hidden" name="symbol" value="{{ symbol }}">
   <input type="hidden" name="trading_tf" value="{{ trading_tf }}">
   <input type="hidden" name="atr_tf" value="{{ atr_tf }}">
@@ -89,15 +104,16 @@
 {% set growth_pct = growth_pct | default(0) %}
 {% set top6 = top6_ws | default([]) %}
 {% set bt_capital = bt_cap | default(capital) %}
+{% set cur = currency_sym | default('$') %}
 
 {# ── Hero: symbol + collapsible params strip ─────────────────────────── #}
 <section class="hero">
   <div class="hero-top">
     <div class="hero-left">
-      <div class="coin-badge">{{ symbol | replace('USDT','') | replace('BUSD','') | truncate(4,true,'') }}</div>
+      <div class="coin-badge">{{ symbol | replace('USDT','') | replace('BUSD','') | replace('USD_PERP','') | truncate(4,true,'') }}</div>
       <div>
         <div style="display:flex;align-items:center;gap:10px">
-          <span class="hero-symbol">{{ symbol | replace('USDT','') | replace('BUSD','') }}</span>
+          <span class="hero-symbol">{{ symbol | replace('USDT','') | replace('BUSD','') | replace('USD_PERP','') }}</span>
           <span class="hero-tag">BACKTEST</span>
         </div>
         <div class="hero-sub">
@@ -106,10 +122,6 @@
       </div>
     </div>
     <div class="hero-cta">
-      <button class="hero-btn hero-btn-dark" onclick="exportCsv({{ bt_job_id | tojson }})">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
-        Export CSV
-      </button>
       <button class="hero-btn hero-btn-ghost" id="paramsToggleBtn" onclick="toggleParams()">
         <svg class="params-chevron" viewBox="0 0 24 24" width="16" height="16"><path d="M6 9l6 6 6-6"/></svg>
       </button>
@@ -150,6 +162,7 @@
 </div>
 
 <div class="stat-grid">
+
   <div class="stat">
     <div class="stat-lbl">Total Cycles</div>
     <div class="stat-val mono">{{ '{:,}'.format(total_cycles) }}</div>
@@ -162,44 +175,90 @@
     <div class="stat-foot">{{ winning }}/{{ total_cycles }}</div>
   </div>
 
-  <div class="stat featured">
+  <div class="stat featured{% if result.total_net_pnl < 0 %} neg-pnl{% endif %}">
     <div class="stat-lbl">Total Net P&amp;L</div>
     <div class="stat-val mono">
-      {% if result.total_net_pnl >= 0 %}+{% endif %}${{ '{:,.2f}'.format(result.total_net_pnl) }}
+      {% if result.total_net_pnl >= 0 %}+{% endif %}{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl) }}
     </div>
     <div class="stat-foot">
-      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%+.1f'|format(growth_pct) }}% on ${{ '{:,.0f}'.format(bt_capital) }}
+      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%+.1f'|format(growth_pct) }}% on {{ cur }}{{ '{:,.0f}'.format(bt_capital) }}
     </div>
   </div>
 
   <div class="stat">
-    <div class="stat-lbl">Avg Whipsaws / Cycle</div>
+    <div class="stat-lbl">Avg Whipsaws</div>
     <div class="stat-val mono">{{ result.avg_whipsaws }}</div>
-    <div class="stat-foot muted-foot">top: {{ top6[0] if top6 else 0 }}</div>
+    <div class="stat-foot muted-foot">per cycle</div>
   </div>
 
   <div class="stat">
-    <div class="stat-lbl">Top 6 Max Whipsaws</div>
+    <div class="stat-lbl">Top Max Whipsaws</div>
     <div class="stat-val mono">{{ top6[0] if top6 else 0 }}</div>
-    <div class="stat-note">{{ top6[1:] | join(' · ') }}</div>
+    <div style="align-self:end;display:flex;flex-wrap:wrap;gap:3px">
+      {% for w in top6 %}
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;
+                   background:var(--line);color:var(--beige-dim);
+                   padding:2px 7px;border-radius:999px;font-weight:500">{{ w }}</span>
+      {% endfor %}
+    </div>
   </div>
 
   <div class="stat">
-    <div class="stat-lbl">Worst Intra-Cycle Loss</div>
-    <div class="stat-val mono neg">-${{ '{:,.2f}'.format(result.worst_intra_loss | abs) }}</div>
-    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }}</div>
+    <div class="stat-lbl">Worst Cycle Loss</div>
+    <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.worst_intra_loss | abs) }}</div>
+    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cur }}{{ '{:,.0f}'.format(cap_at_worst) }}</div>
   </div>
 
   <div class="stat">
     <div class="stat-lbl">Total Fees Paid</div>
-    <div class="stat-val mono neg">-${{ '{:,.2f}'.format(result.total_fees | abs) }}</div>
+    <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.total_fees | abs) }}</div>
     <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }} trades</div>
   </div>
+
+</div>
+
+{# ── Charts ──────────────────────────────────────────────────────────── #}
+{% set ch = bt_charts %}
+{% if ch %}
+
+{# ── Capital per Trade (most granular — first below summary) ─────────── #}
+<div class="card" style="margin-bottom:16px">
+  <div class="card-head">
+    <div>
+      <div class="card-title">Capital per Trade</div>
+      <div class="card-meta" style="margin-top:3px">Balance after every filled order · {{ ch.ct_trades }} trades</div>
+    </div>
+    <div class="chart-legend" style="margin-bottom:0">
+      <span class="legend-dot gold">Capital ({{ cur }})</span>
+    </div>
+  </div>
+  <svg class="chart" viewBox="0 0 750 260" preserveAspectRatio="none" overflow="visible">
+    {% for lbl in ch.ct_y_lbls %}
+    <line class="grid-line" x1="40" y1="{{ lbl.y }}" x2="710" y2="{{ lbl.y }}"/>
+    {% endfor %}
+    <g class="axis-label">
+      {% for lbl in ch.ct_y_lbls %}
+      <text x="34" y="{{ lbl.y + 4 }}" text-anchor="end">{{ lbl.label }}</text>
+      {% endfor %}
+    </g>
+    <g class="axis-label">
+      {% for lbl in ch.ct_x_lbls %}
+      <text x="{{ lbl.x }}" y="234" text-anchor="middle">{{ lbl.label }}</text>
+      {% endfor %}
+    </g>
+    <defs>
+      <linearGradient id="goldFill2" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="#FADD56" stop-opacity="0.22"/>
+        <stop offset="100%" stop-color="#FADD56" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path d="{{ ch.ct_area }}" fill="url(#goldFill2)"/>
+    <path d="{{ ch.ct_line }}" fill="none" stroke="#FADD56" stroke-width="1.5"/>
+    <text class="axis-title" x="375" y="252" text-anchor="middle">Trade #</text>
+  </svg>
 </div>
 
 {# ── Equity Curve + Whipsaw Breakdown ────────────────────────────────── #}
-{% set ch = bt_charts %}
-{% if ch %}
 <div class="split">
 
   <!-- Equity Curve -->
@@ -211,10 +270,10 @@
       </div>
     </div>
     <div class="chart-legend">
-      <span class="legend-dot sky">Net P&amp;L (USD)</span>
+      <span class="legend-dot sky">Net P&amp;L ({{ cur }})</span>
       <span class="legend-dot green">Break-even</span>
     </div>
-    <svg class="chart" viewBox="0 0 750 280" preserveAspectRatio="none" overflow="visible">
+    <svg class="chart" viewBox="0 0 750 295" preserveAspectRatio="none" overflow="visible">
       {% for lbl in ch.eq_y_lbls %}
       <line class="grid-line" x1="40" y1="{{ lbl.y }}" x2="710" y2="{{ lbl.y }}"/>
       {% endfor %}
@@ -228,7 +287,7 @@
         <text x="{{ lbl.x }}" y="265" text-anchor="middle">{{ lbl.label }}</text>
         {% endfor %}
       </g>
-      <text class="axis-title" x="375" y="280" text-anchor="middle">Cycle #</text>
+      <text class="axis-title" x="375" y="282" text-anchor="middle">Cycle #</text>
       <defs>
         <linearGradient id="skyFill" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stop-color="#7BC6F2" stop-opacity="0.30"/>
@@ -239,7 +298,6 @@
       <path d="{{ ch.eq_line }}" fill="none" stroke="#7BC6F2" stroke-width="2"/>
       <line x1="40" y1="{{ ch.eq_zero_y }}" x2="710" y2="{{ ch.eq_zero_y }}"
             stroke="#B5E000" stroke-width="1.2" stroke-dasharray="3 4" opacity="0.55"/>
-      <!-- Breathing endpoint dot -->
       <circle cx="{{ ch.eq_ep_x }}" cy="{{ ch.eq_ep_y }}" r="9" fill="#B5E000">
         <animate attributeName="r" values="9;15;9" dur="2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
         <animate attributeName="fill-opacity" values="0.22;0;0.22" dur="2s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
@@ -265,6 +323,7 @@
     <div class="wh-table">
       <div class="h">N</div>
       <div class="h">Distribution</div>
+      <div class="h" style="text-align:right">Count</div>
       <div class="h" style="text-align:right">%</div>
       <div class="h" style="text-align:right">Σ%</div>
       {% for row in ws_breakdown %}
@@ -272,6 +331,7 @@
       <div class="wh-bar-cell">
         <div class="wh-bar {% if row.color != 'pos' %}{{ row.color }}{% endif %}" style="width:{{ row.bar_w }}%"></div>
       </div>
+      <div class="wh-pct {{ row.color }}" style="font-weight:600">{{ row.cnt }}</div>
       <div class="wh-pct {{ row.color }}">{{ row.pct }}</div>
       <div class="wh-cum">{{ row.cum }}</div>
       {% endfor %}
@@ -293,10 +353,10 @@
         <div class="card-meta" style="margin-top:3px">Account balance after each cycle · {{ ch.cap_cycles }} cycles</div>
       </div>
       <div class="chart-legend" style="margin-bottom:0">
-        <span class="legend-dot gold">Capital (USD)</span>
+        <span class="legend-dot gold">Capital ({{ cur }})</span>
       </div>
     </div>
-    <svg class="chart" viewBox="0 0 750 240" preserveAspectRatio="none">
+    <svg class="chart" viewBox="0 0 750 260" preserveAspectRatio="none" overflow="visible">
       {% for lbl in ch.cap_y_lbls %}
       <line class="grid-line" x1="40" y1="{{ lbl.y }}" x2="710" y2="{{ lbl.y }}"/>
       {% endfor %}
@@ -307,7 +367,7 @@
       </g>
       <g class="axis-label">
         {% for lbl in ch.cap_x_lbls %}
-        <text x="{{ lbl.x }}" y="232" text-anchor="middle">{{ lbl.label }}</text>
+        <text x="{{ lbl.x }}" y="234" text-anchor="middle">{{ lbl.label }}</text>
         {% endfor %}
       </g>
       <defs>
@@ -318,7 +378,7 @@
       </defs>
       <path d="{{ ch.cap_area }}" fill="url(#goldFill)"/>
       <path d="{{ ch.cap_line }}" fill="none" stroke="#FADD56" stroke-width="2"/>
-      <text class="axis-title" x="375" y="248" text-anchor="middle">Cycle #</text>
+      <text class="axis-title" x="375" y="252" text-anchor="middle">Cycle #</text>
     </svg>
   </div>
 
@@ -335,7 +395,7 @@
         <span style="color:var(--neg)">● 6+</span>
       </div>
     </div>
-    <svg class="chart" viewBox="0 0 750 240" preserveAspectRatio="none">
+    <svg class="chart" viewBox="0 0 750 260" preserveAspectRatio="none" overflow="visible">
       {% for lbl in ch.ws_y_lbls %}
       <line class="grid-line" x1="40" y1="{{ lbl.y }}" x2="710" y2="{{ lbl.y }}"/>
       {% endfor %}
@@ -346,50 +406,13 @@
       </g>
       <g class="axis-label">
         {% for lbl in ch.ws_x_lbls %}
-        <text x="{{ lbl.x }}" y="232" text-anchor="middle">{{ lbl.label }}</text>
+        <text x="{{ lbl.x }}" y="234" text-anchor="middle">{{ lbl.label }}</text>
         {% endfor %}
       </g>
-      <text class="axis-title" x="375" y="248" text-anchor="middle">Cycle #</text>
+      <text class="axis-title" x="375" y="252" text-anchor="middle">Cycle #</text>
       <g>{{ ch.ws_bars_svg | safe }}</g>
     </svg>
   </div>
-</div>
-
-{# ── Capital per Trade ────────────────────────────────────────────────── #}
-<div class="card" style="margin-bottom:16px">
-  <div class="card-head">
-    <div>
-      <div class="card-title">Capital per Trade</div>
-      <div class="card-meta" style="margin-top:3px">Balance after every filled order · {{ ch.ct_trades }} trades</div>
-    </div>
-    <div class="chart-legend" style="margin-bottom:0">
-      <span class="legend-dot gold">Capital (USD)</span>
-    </div>
-  </div>
-  <svg class="chart" viewBox="0 0 750 240" preserveAspectRatio="none">
-    {% for lbl in ch.ct_y_lbls %}
-    <line class="grid-line" x1="40" y1="{{ lbl.y }}" x2="710" y2="{{ lbl.y }}"/>
-    {% endfor %}
-    <g class="axis-label">
-      {% for lbl in ch.ct_y_lbls %}
-      <text x="34" y="{{ lbl.y + 4 }}" text-anchor="end">{{ lbl.label }}</text>
-      {% endfor %}
-    </g>
-    <g class="axis-label">
-      {% for lbl in ch.ct_x_lbls %}
-      <text x="{{ lbl.x }}" y="232" text-anchor="middle">{{ lbl.label }}</text>
-      {% endfor %}
-    </g>
-    <defs>
-      <linearGradient id="goldFill2" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%" stop-color="#FADD56" stop-opacity="0.22"/>
-        <stop offset="100%" stop-color="#FADD56" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <path d="{{ ch.ct_area }}" fill="url(#goldFill2)"/>
-    <path d="{{ ch.ct_line }}" fill="none" stroke="#FADD56" stroke-width="1.5"/>
-    <text class="axis-title" x="375" y="248" text-anchor="middle">Trade #</text>
-  </svg>
 </div>
 {% endif %}
 
@@ -397,7 +420,7 @@
 <div class="section-head" style="margin-top:28px">
   <h2>Cycle Log</h2>
   <div class="section-sub">
-    Starting capital <strong style="color:var(--beige)">${{ '{:,.2f}'.format(bt_capital) }}</strong>
+    Starting capital <strong style="color:var(--beige)">{{ cur }}{{ '{:,.2f}'.format(bt_capital) }}</strong>
     · {{ bt_log | length }} cycles
   </div>
 </div>
@@ -409,9 +432,9 @@
       <input placeholder="Filter by cycle #, exit, date…" id="searchInput" oninput="filterLog()">
     </div>
     <select class="filter-select" id="exitFilter" onchange="filterLog()">
-      <option value="">All cycles</option>
-      <option value="LONG_TP">Long TP</option>
-      <option value="SHORT_TP">Short TP</option>
+      <option value="">All Cycles</option>
+      <option value="LONG_TP">Exit Long</option>
+      <option value="SHORT_TP">Exit Short</option>
       <option value="ABORTED">Aborted</option>
       <option value="LIQ">Liquidated</option>
     </select>
@@ -455,7 +478,7 @@
           <td class="{% if row.worst_neg %}pl-neg{% endif %}">{{ row.worst }}</td>
           <td>
             <span class="pill {% if row.liq %}liq{% elif 'LONG' in row.exit %}long{% elif 'SHORT' in row.exit %}short{% else %}stopped{% endif %}">
-              {{ row.exit }}
+              {{ row.exit_display }}
             </span>
           </td>
           <td style="color:var(--beige-dim)">{{ row.start }}</td>

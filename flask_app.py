@@ -61,6 +61,7 @@ LOT_SPECS = {
     'JUPUSDT':      (1.0,   1.0,   0),
     'NEARUSDT':     (1.0,   1.0,   0),
     'ONDOUSDT':     (0.1,   0.1,   1),
+    'ORDIUSDT':     (1,     1,     0),
     'SOLUSDT':      (0.01,  0.01,  2),
     'SUIUSDT':      (0.1,   0.1,   1),
     'XAUUSDT':      (0.001, 0.001, 3),
@@ -78,8 +79,9 @@ COINM_LOT_SPECS = {
     'SOLUSD_PERP': (1, 1, 0),
     'DOTUSD_PERP': (1, 1, 0),
     'LINKUSD_PERP': (1, 1, 0),
-    'LTCUSD_PERP': (1, 1, 0),
-    'BCHUSD_PERP': (1, 1, 0),
+    'LTCUSD_PERP':  (1, 1, 0),
+    'BCHUSD_PERP':  (1, 1, 0),
+    'ORDIUSD_PERP': (1, 1, 0),
 }
 
 
@@ -181,7 +183,7 @@ def _save_to_session(d):
 
 
 # ── SVG Chart helpers ─────────────────────────────────────────────────────────
-def _build_bt_charts(result, capital: float) -> dict:
+def _build_bt_charts(result, capital: float, cur_sym: str = '$') -> dict:
     """Build SVG path data for all backtest charts."""
     cycles = result.cycles
     if not cycles:
@@ -207,18 +209,19 @@ def _build_bt_charts(result, capital: float) -> dict:
     eq_ep = eq_pts[-1]
     eq_zero_y = py_eq(capital)
 
-    def _y_lbls(ymin, ymax, steps=4):
+    def _y_lbls(ymin, ymax, steps=4, y_bot=240, y_top=40):
+        """Y-axis labels. y_bot = pixel y at value ymin, y_top = pixel y at value ymax."""
         rng = ymax - ymin or 1
         out = []
         for i in range(steps + 1):
             v = ymin + rng * i / steps
-            yp = round(240 + ((v - ymin) / rng) * (40 - 240), 1)
+            yp = round(y_bot + ((v - ymin) / rng) * (y_top - y_bot), 1)
             if abs(v) >= 1000:
-                lbl = f'${v/1000:.1f}k'
+                lbl = f'{cur_sym}{v/1000:.1f}k'
             elif abs(v) >= 10:
-                lbl = f'${v:.0f}'
+                lbl = f'{cur_sym}{v:.0f}'
             else:
-                lbl = f'${v:.1f}'
+                lbl = f'{cur_sym}{v:.1f}'
             out.append({'y': yp, 'label': lbl})
         return out
 
@@ -275,34 +278,37 @@ def _build_bt_charts(result, capital: float) -> dict:
         ws_bars_svg += f'<rect x="{bx}" y="{by}" width="{bar_w:.1f}" height="{bh}" fill="{col}" rx="2"/>'
 
     return dict(
-        # Equity curve
+        # Equity curve — chart area y: 40 (top) … 240 (bottom)
         eq_line=eq_line, eq_area=eq_area, eq_ep_x=eq_ep[0], eq_ep_y=eq_ep[1],
         eq_zero_y=eq_zero_y,
-        eq_y_lbls=_y_lbls(eq_min, eq_max),
+        eq_y_lbls=_y_lbls(eq_min, eq_max, y_bot=240, y_top=40),
         eq_x_lbls=_x_lbls(n),
         eq_cycles=n,
-        # Capital per cycle
+        # Capital per cycle — chart area y: 20 (top) … 220 (bottom)
         cap_line=cap_line, cap_area=cap_area,
-        cap_y_lbls=_y_lbls(cap_min, cap_max),
+        cap_y_lbls=_y_lbls(cap_min, cap_max, y_bot=220, y_top=20),
         cap_x_lbls=_x_lbls(n),
         cap_cycles=n,
-        # Capital per trade
+        # Capital per trade — chart area y: 20 (top) … 220 (bottom)
         ct_line=ct_line, ct_area=ct_area,
-        ct_y_lbls=_y_lbls(ct_min, ct_max),
+        ct_y_lbls=_y_lbls(ct_min, ct_max, y_bot=220, y_top=20),
         ct_x_lbls=_x_lbls(m),
         ct_trades=m - 1,
-        # Whipsaws bars
+        # Whipsaws bars — chart area y: 40 (top) … 220 (bottom)
         ws_bars_svg=ws_bars_svg,
         ws_y_lbls=[{'y': round(220 - i / 4 * 180, 1), 'label': str(int(ws_max_val * i / 4))} for i in range(5)],
         ws_x_lbls=_x_lbls(n),
     )
 
 
-def _prep_bt_log(result, capital: float, trading_tf: str) -> list:
-    TF_MS = {
-        '1m': 60000, '5m': 300000, '15m': 900000, '30m': 1800000,
-        '1h': 3600000, '4h': 14400000, '12h': 43200000, '1d': 86400000,
-    }
+_EXIT_DISPLAY = {
+    'LONG_TP':  'Exit Long',
+    'SHORT_TP': 'Exit Short',
+    'LIQ':      'Liquidated',
+    'ABORTED':  'Aborted',
+}
+
+def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$') -> list:
     cap = capital
     rows = []
     for c in result.cycles:
@@ -312,11 +318,12 @@ def _prep_bt_log(result, capital: float, trading_tf: str) -> list:
         liq = not c.capital_ok
         aborted = c.exit_direction == 'ABORTED'
         exit_str = 'LIQ' if liq else ('ABORTED' if aborted else c.exit_direction)
+        exit_display = _EXIT_DISPLAY.get(exit_str, exit_str.replace('_', ' '))
         rows.append({
             'num': c.cycle_num,
-            'capital': f'${cap:,.2f}',
+            'capital': f'{cur_sym}{cap:,.2f}',
             'pnl': c.net_pnl,
-            'pnl_fmt': (f'+${c.net_pnl:,.2f}' if c.net_pnl >= 0 else f'-${abs(c.net_pnl):,.2f}'),
+            'pnl_fmt': (f'+{cur_sym}{c.net_pnl:,.2f}' if c.net_pnl >= 0 else f'-{cur_sym}{abs(c.net_pnl):,.2f}'),
             'pnl_pos': c.net_pnl >= 0,
             'entry': f'{c.entry_price:.4f}',
             'atr': f'{c.atr_at_entry:.4f}',
@@ -325,9 +332,10 @@ def _prep_bt_log(result, capital: float, trading_tf: str) -> list:
             'ws': c.whipsaws,
             'ws_color': 'pos' if c.whipsaws == 0 else ('warn' if c.whipsaws <= 5 else 'neg'),
             'dur': f'{c.duration_candles} candles',
-            'worst': (f'-${abs(c.peak_intra_loss):,.2f}' if c.peak_intra_loss < 0 else f'${c.peak_intra_loss:,.2f}'),
+            'worst': (f'-{cur_sym}{abs(c.peak_intra_loss):,.2f}' if c.peak_intra_loss < 0 else f'{cur_sym}{c.peak_intra_loss:,.2f}'),
             'worst_neg': c.peak_intra_loss < 0,
             'exit': exit_str,
+            'exit_display': exit_display,
             'exit_long': 'LONG' in exit_str,
             'liq': liq,
             'aborted': aborted,
@@ -599,8 +607,10 @@ def bt_result_view(job_id):
             cap_at_worst = cap_running
         cap_running += c.net_pnl
 
-    log = _prep_bt_log(result, bt_cap, d_job.get('trading_tf', '1h'))
-    charts = _build_bt_charts(result, bt_cap)
+    cur_sym = d.get('base_asset', '') if d.get('market_type') == 'COINM' else '$'
+
+    log = _prep_bt_log(result, bt_cap, d_job.get('trading_tf', '1h'), cur_sym)
+    charts = _build_bt_charts(result, bt_cap, cur_sym)
 
     return render_template('simulator/backtest.html',
                            bt_job_id=job_id,
@@ -614,6 +624,7 @@ def bt_result_view(job_id):
                            top6_ws=top6_ws,
                            ws_breakdown=ws_breakdown,
                            cap_at_worst=cap_at_worst,
+                           currency_sym=cur_sym,
                            **_ctx(d, 'backtest'))
 
 

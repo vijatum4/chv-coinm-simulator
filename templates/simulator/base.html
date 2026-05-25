@@ -629,7 +629,7 @@ input[type=range].sf-range::-moz-range-track{
               <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
               {% endfor %}
             {% else %}
-              {% for sym in ['SOLUSDT','BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','FARTCOINUSDT','SUIUSDT','DOGEUSDT','AVAXUSDT','NEARUSDT','ONDOUSDT','ORDIUSDT','JUPUSDT','JTOUSDT','XAUUSDT'] %}
+              {% for sym in available_symbols %}
               <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
               {% endfor %}
             {% endif %}
@@ -718,7 +718,13 @@ input[type=range].sf-range::-moz-range-track{
         </div>
         {% if market_type == 'COINM' %}
           {% set _csize = 100 if base_asset == 'BTC' else 10 %}
-          <div id="lotsHint" class="lots-hint">{{ base_lots | int }} × ${{ _csize }} = ${{ (base_lots * _csize) | int }} USD notional</div>
+          {% set _notional = base_lots * _csize %}
+          {% if price_val and price_val > 0 %}
+            {% set _coins = _notional / price_val %}
+            <div id="lotsHint" class="lots-hint">{{ base_lots | int }} × ${{ _csize }} = {{ "%.4f" | format(_coins) }} {{ base_asset }}  (at ${{ "%.4f" | format(price_val) }})</div>
+          {% else %}
+            <div id="lotsHint" class="lots-hint">{{ base_lots | int }} × ${{ _csize }} = ${{ _notional | int }} USD notional — fetch price for {{ base_asset }} amount</div>
+          {% endif %}
         {% else %}
           <div id="lotsHint" class="lots-hint" style="display:none"></div>
         {% endif %}
@@ -806,9 +812,7 @@ const TF_RULE = {{ tf_rule | tojson }};
 
 // USDM / COINM symbol lists (for client-side tab switching)
 const MARKET_SYMBOLS = {
-  'USDM': ['SOLUSDT','BTCUSDT','ETHUSDT','BNBUSDT','XRPUSDT','FARTCOINUSDT',
-           'SUIUSDT','DOGEUSDT','AVAXUSDT','NEARUSDT','ONDOUSDT','ORDIUSDT',
-           'JUPUSDT','JTOUSDT','XAUUSDT'],
+  'USDM': {{ available_symbols | tojson }},
   'COINM': {{ coinm_symbols | tojson }},
 };
 
@@ -824,8 +828,17 @@ function updateLotsHint(marketVal, symbolVal, lotsVal) {
   const base = getBaseAsset(symbolVal || '', marketVal);
   const cSize = base === 'BTC' ? 100 : 10;
   const n = parseFloat(lotsVal) || 0;
-  const total = Math.round(n * cSize * 100) / 100;
-  hint.textContent = `${n} × $${cSize} = $${total} USD notional`;
+  const notional = n * cSize;
+  const price = parseFloat(document.getElementById('priceInput')?.value) || 0;
+  if (price > 0) {
+    const coins = notional / price;
+    const coinStr = coins < 0.01
+      ? coins.toFixed(6)
+      : coins < 1 ? coins.toFixed(4) : coins.toFixed(3);
+    hint.textContent = `${n} × $${cSize} = ${coinStr} ${base}  (at $${price.toLocaleString(undefined,{maximumFractionDigits:4})})`;
+  } else {
+    hint.textContent = `${n} × $${cSize} = $${notional} USD notional — fetch price for ${base} amount`;
+  }
   hint.style.display = '';
 }
 
@@ -894,6 +907,10 @@ function fetchPriceAtr() {
         document.getElementById('atrInput').value = data.atr;
         statusEl.textContent = `✓ Price: ${data.price.toFixed(4)}  ATR: ${data.atr.toFixed(4)}`;
         statusEl.style.color = 'var(--green)';
+        // Refresh lots hint now that price is known
+        const mkt = document.getElementById('marketTypeInput')?.value || 'USDM';
+        const lotsInp = document.getElementById('baseLotsInput');
+        updateLotsHint(mkt, sym, lotsInp ? lotsInp.value : 0);
       } else {
         statusEl.textContent = '✗ ' + (data.error || 'Failed');
         statusEl.style.color = 'var(--neg)';

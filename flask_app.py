@@ -485,6 +485,7 @@ def _bt_worker(job_id: str):
 
 # ── Shared template context ────────────────────────────────────────────────────
 def _ctx(d, mode):
+    usdm_syms = get_available_symbols()
     return dict(
         **d,
         mode=mode,
@@ -493,6 +494,7 @@ def _ctx(d, mode):
         tf_choices=TF_CHOICES,
         tf_rule=TF_RULE,
         lot_specs=LOT_SPECS,
+        available_symbols=usdm_syms,
         coinm_symbols=get_coinm_symbols(),
     )
 

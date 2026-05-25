@@ -276,7 +276,7 @@ def _build_bt_charts(result, capital: float, cur_sym: str = '$') -> dict:
     ws_bars_svg = ''
     for i, w in enumerate(ws_vals):
         bx = round(x0 + i / n * (x1 - x0), 1)
-        bh = round((w / ws_max_val) * 180, 1) if ws_max_val else 0
+        bh = max(3.0, round((w / ws_max_val) * 180, 1)) if ws_max_val else 3.0
         by = 220 - bh
         col = '#B5E000' if w <= 2 else ('#FADD56' if w <= 5 else 'oklch(0.66 0.18 28)')
         ws_bars_svg += f'<rect x="{bx}" y="{by}" width="{bar_w:.1f}" height="{bh}" fill="{col}" rx="2"/>'

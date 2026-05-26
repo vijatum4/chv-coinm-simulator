@@ -681,14 +681,15 @@ input[type=range].sf-range::-moz-range-track{
       <div class="sb-section">
         <span class="sb-label">Position &amp; Capital</span>
 
-        <div class="sf-row">
+        <div class="sf-row" style="margin-bottom:4px">
           <label class="sf-field-label" id="baseLotsLabel">Base Lots ({{ base_asset }})</label>
           <input class="sf-input mono" type="number" name="base_lots" id="baseLotsInput"
                  value="{{ base_lots }}" step="{{ lot_step }}" min="{{ lot_min }}"
                  oninput="updateLotsUsd()">
-          <span class="sf-caption" id="lotsUsdNote" style="display:none"></span>
+        </div>
+        <div id="lotsUsdNote" style="display:none;font-size:10.5px;color:var(--muted);margin-top:-2px;margin-bottom:10px;line-height:1.4"></div>
 
-        <div class="sf-slider-row" style="margin-top:12px">
+        <div class="sf-slider-row">
           <div class="sf-slider-head">
             <label class="sf-slider-lbl" for="leverageRange">Leverage</label>
             <span class="sf-slider-badge" id="leverageBadge">{{ leverage }}×</span>

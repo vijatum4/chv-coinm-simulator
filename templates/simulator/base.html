@@ -723,7 +723,7 @@ input[type=range].sf-range::-moz-range-track{
           {% set _notional = base_lots * _csize %}
           {% if price_val and price_val > 0 %}
             {% set _coins = _notional / price_val %}
-            <div id="lotsHint" class="lots-hint">{{ base_lots | int }} × ${{ _csize }} = {{ "%.4f" | format(_coins) }} {{ base_asset }}  (at ${{ "%.4f" | format(price_val) }})</div>
+            <div id="lotsHint" class="lots-hint">{{ base_lots | int }} × ${{ _csize }} = {{ "%.4f" | format(_coins) }} {{ base_asset }} (${{ '{:,.2f}'.format(_notional) | replace('.00','') }})</div>
           {% else %}
             <div id="lotsHint" class="lots-hint">{{ base_lots | int }} × ${{ _csize }} = ${{ _notional | int }} USD notional — fetch price for {{ base_asset }} amount</div>
           {% endif %}
@@ -837,7 +837,10 @@ function updateLotsHint(marketVal, symbolVal, lotsVal) {
     const coinStr = coins < 0.01
       ? coins.toFixed(6)
       : coins < 1 ? coins.toFixed(4) : coins.toFixed(3);
-    hint.textContent = `${n} × $${cSize} = ${coinStr} ${base}  (at $${price.toLocaleString(undefined,{maximumFractionDigits:4})})`;
+    const notionalFmt = notional % 1 === 0
+      ? notional.toLocaleString()
+      : notional.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+    hint.textContent = `${n} × $${cSize} = ${coinStr} ${base} ($${notionalFmt})`;
   } else {
     hint.textContent = `${n} × $${cSize} = $${notional} USD notional — fetch price for ${base} amount`;
   }

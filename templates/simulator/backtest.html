@@ -198,7 +198,7 @@
       {% if result.total_net_pnl >= 0 %}+{% endif %}{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl) }}
     </div>
     <div class="stat-foot">
-      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%+.1f'|format(growth_pct) }}% on {{ cur }}{{ '{:,.0f}'.format(bt_capital) }}
+      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%+.1f'|format(growth_pct) }}% on {{ cur }}{{ bt_capital | capfmt }}
     </div>
   </div>
 
@@ -212,11 +212,9 @@
     <div class="stat-lbl">Max Whipsaws</div>
     <div class="stat-val mono">{{ top6[0] if top6 else 0 }}</div>
     {% if top6 | length > 1 %}
-    <div style="align-self:end;background:var(--line);border-radius:999px;
-                padding:4px 10px;display:flex;gap:9px;align-items:center;flex-wrap:wrap">
+    <div class="stat-foot muted-foot" style="gap:9px">
       {% for w in top6[1:] %}
-      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;
-                   color:var(--beige-dim);font-weight:500">{{ w }}</span>
+      <span>{{ w }}</span>
       {% endfor %}
     </div>
     {% else %}
@@ -227,13 +225,13 @@
   <div class="stat">
     <div class="stat-lbl">Worst Cycle Loss</div>
     <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.worst_intra_loss | abs) }}</div>
-    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cur }}{{ '{:,.0f}'.format(cap_at_worst) }}</div>
+    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cur }}{{ cap_at_worst | capfmt }}</div>
   </div>
 
   <div class="stat">
     <div class="stat-lbl">Total Fees Paid</div>
     <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.total_fees | abs) }}</div>
-    <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }}t</div>
+    <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }} t</div>
   </div>
 
 </div>

@@ -85,6 +85,20 @@ COINM_LOT_SPECS = {
 }
 
 
+# ── Template filters ─────────────────────────────────────────────────────────
+@app.template_filter('capfmt')
+def capfmt(v):
+    """Compact capital: 30000 → '30k', 1500 → '1.5k', 500 → '500'"""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    if v >= 1000:
+        k = v / 1000
+        return f'{int(k)}k' if k == int(k) else f'{k:.1f}k'
+    return f'{v:,.0f}'
+
+
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _sidebar_defaults():
     """Defaults that match the Streamlit app exactly."""
@@ -607,7 +621,7 @@ def bt_result_view(job_id):
     total_trades = sum(len(c.steps) for c in result.cycles)
     growth_pct = (result.total_net_pnl / bt_cap * 100) if bt_cap else 0
     all_ws_sorted = sorted([c.whipsaws for c in result.cycles], reverse=True)
-    top6_ws = all_ws_sorted[:6]  # top 6 with duplicates allowed
+    top6_ws = all_ws_sorted[:5]  # big number + 4 sub-numbers
     ws_breakdown = _build_ws_breakdown(result)
 
     # capital at worst_intra_loss_cycle

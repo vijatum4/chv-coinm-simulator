@@ -4,7 +4,7 @@ __pycache__/
 *.pyo
 .env
 backtests/*.csv
-.streamlit/
+.streamlit/*.json
 *.db
 *.db-shm
 *.db-wal

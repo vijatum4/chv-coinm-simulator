@@ -15,8 +15,7 @@ sys.path.insert(0, str(SIM_DIR))
 from chv_engine import calculate_params, simulate, optimize, generate_bot_config, CHVParams, SimResult
 from backtest_engine import run_backtest
 from data_fetcher import (fetch_historical_ohlcv, klines_to_candles,
-                          fetch_price_and_atr, get_available_symbols,
-                          get_coinm_symbols)
+                          fetch_price_and_atr, get_available_symbols)
 
 app = Flask(__name__, template_folder=str(SIM_DIR / 'templates'),
             static_folder=str(SIM_DIR / 'static'))
@@ -70,19 +69,6 @@ LOT_SPECS = {
 MAX_STEPS = 50  # matches Streamlit
 
 # CoinM lot specs (lots = contracts; BTC=$100/contract, others=$10/contract)
-COINM_LOT_SPECS = {
-    'BTCUSD_PERP': (1, 1, 0),
-    'ETHUSD_PERP': (1, 1, 0),
-    'BNBUSD_PERP': (1, 1, 0),
-    'XRPUSD_PERP': (1, 1, 0),
-    'ADAUSD_PERP': (1, 1, 0),
-    'SOLUSD_PERP': (1, 1, 0),
-    'DOTUSD_PERP': (1, 1, 0),
-    'LINKUSD_PERP': (1, 1, 0),
-    'LTCUSD_PERP':  (1, 1, 0),
-    'BCHUSD_PERP':  (1, 1, 0),
-    'ORDIUSD_PERP': (1, 1, 0),
-}
 
 
 # ── Template filters ─────────────────────────────────────────────────────────
@@ -122,8 +108,6 @@ def _sidebar_defaults():
         atr_guard_multiplier=1.0, # matches Streamlit default
         use_live=True,
         base_asset='SOL',
-        settle_coin='USDT',
-        market_type='USDM',
     )
 
 
@@ -131,17 +115,9 @@ def _parse_sidebar(form, sess):
     d = _sidebar_defaults()
     src = {**sess, **form}
 
-    # Market type (USDM or COINM)
-    d['market_type'] = form.get('market_type', src.get('market_type', 'USDM'))
-
     sym = src.get('symbol', d['symbol'])
     d['symbol'] = sym
-    if '_PERP' in sym:
-        d['base_asset'] = sym.split('USD')[0]
-        d['settle_coin'] = 'USD'
-    else:
-        d['base_asset'] = sym.replace('USDT', '').replace('BUSD', '')
-        d['settle_coin'] = 'USDT'
+    d['base_asset'] = sym.replace('USDT', '').replace('BUSD', '')
 
     for key in ('trading_tf', 'atr_tf'):
         if src.get(key):
@@ -164,9 +140,9 @@ def _parse_sidebar(form, sess):
         except (KeyError, TypeError, ValueError):
             pass
 
-    # Apply mode-appropriate capital default when no explicit value was submitted
+    # Apply capital default when no explicit value was submitted
     if 'capital' not in form and 'capital' not in sess:
-        d['capital'] = 1.0 if d['market_type'] == 'COINM' else 1000.0
+        d['capital'] = 1000.0
 
     for key in ('ws_limit_on', 'atr_guard_on', 'use_live'):
         val = src.get(key, '')
@@ -180,10 +156,7 @@ def _parse_sidebar(form, sess):
         d['slip_pct'] = 0.0005  # default to liquid pairs
 
     # Lot spec for display
-    if d.get('market_type') == 'COINM':
-        min_qty, step, dec = COINM_LOT_SPECS.get(sym, (1, 1, 0))
-    else:
-        min_qty, step, dec = LOT_SPECS.get(sym, (0.001, 0.001, 3))
+    min_qty, step, dec = LOT_SPECS.get(sym, (0.001, 0.001, 3))
     d['lot_min'] = min_qty
     d['lot_step'] = step
     d['lot_dec'] = dec
@@ -443,13 +416,10 @@ def _bt_worker(job_id: str):
         atr_interval = d['atr_tf']
         bt_days = d.get('bt_days', 365)
 
-        mkt = d.get('market_type', 'USDM').lower()
-
         upd(5, f'Fetching {trade_interval} candles…')
         trading_klines, err1 = fetch_historical_ohlcv(
             d['symbol'], trade_interval, days=bt_days,
             progress_callback=lambda p: upd(int(5 + p * 35), f'Fetching {trade_interval} candles…'),
-            market_type=mkt,
         )
         if err1:
             raise RuntimeError(f'Trading candles: {err1}')
@@ -458,7 +428,6 @@ def _bt_worker(job_id: str):
         atr_klines, err2 = fetch_historical_ohlcv(
             d['symbol'], atr_interval, days=bt_days,
             progress_callback=lambda p: upd(int(40 + p * 35), f'Fetching {atr_interval} candles…'),
-            market_type=mkt,
         )
         if err2:
             raise RuntimeError(f'ATR candles: {err2}')
@@ -511,7 +480,6 @@ def _ctx(d, mode):
         tf_rule=TF_RULE,
         lot_specs=LOT_SPECS,
         available_symbols=usdm_syms,
-        coinm_symbols=get_coinm_symbols(),
     )
 
 
@@ -632,7 +600,7 @@ def bt_result_view(job_id):
             cap_at_worst = cap_running
         cap_running += c.net_pnl
 
-    cur_sym = d.get('base_asset', '') if d.get('market_type') == 'COINM' else '$'
+    cur_sym = '$'
 
     log = _prep_bt_log(result, bt_cap, d_job.get('trading_tf', '1h'), cur_sym)
     charts = _build_bt_charts(result, bt_cap, cur_sym)
@@ -850,9 +818,8 @@ def api_price_atr():
     sym = request.args.get('symbol', 'SOLUSDT')
     atr_tf = request.args.get('atr_tf', '4h')
     period = int(request.args.get('atr_period', 5))
-    market_type = request.args.get('market_type', 'usdm').lower()
     try:
-        price, atr, err = fetch_price_and_atr(sym, atr_tf, period, market_type)
+        price, atr, err = fetch_price_and_atr(sym, atr_tf, period)
         if err:
             return jsonify({'ok': False, 'error': err})
         return jsonify({'ok': True, 'price': price, 'atr': atr})

@@ -274,7 +274,6 @@ select.sf-input{cursor:pointer;-webkit-appearance:none;appearance:none;
   align-self:end;font-size:11px;color:var(--muted);
   font-family:'JetBrains Mono',monospace;
 }
-.lots-hint{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-top:3px;padding:0 4px}
 
 /* ── 2-col split ────────────────────────────────────────── */
 .split{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:16px}
@@ -505,21 +504,6 @@ svg.chart{width:100%;display:block}
   .params{grid-template-columns:repeat(3,1fr)}
 }
 
-/* ── Market type tabs ───────────────────────────────────── */
-.market-tabs{
-  display:flex;gap:4px;margin-bottom:14px;
-  background:var(--olive-800);border-radius:10px;padding:3px;
-  border:1px solid var(--line);
-}
-.mt-tab{
-  flex:1;border:0;cursor:pointer;
-  font-family:'Inter Tight',sans-serif;font-weight:700;
-  font-size:11.5px;padding:6px 10px;border-radius:8px;
-  background:transparent;color:var(--muted);
-  transition:background 0.15s,color 0.15s;letter-spacing:0.02em;
-}
-.mt-tab.active{background:var(--green);color:var(--olive-800)}
-.mt-tab:hover:not(.active){color:var(--beige-dim);background:rgba(236,239,206,0.05)}
 
 /* ── Slider rows ────────────────────────────────────────── */
 .sf-slider-row{margin-bottom:10px}
@@ -609,32 +593,15 @@ input[type=range].sf-range::-moz-range-track{
     <!-- Sidebar form — shared params -->
     <form method="POST" action="{{ request.path }}" id="sidebarForm" style="flex:1;padding-bottom:20px">
 
-      <!-- Market type tabs -->
-      <div class="sb-section" style="padding-top:14px;padding-bottom:0">
-        <input type="hidden" name="market_type" id="marketTypeInput" value="{{ market_type }}">
-        <div class="market-tabs">
-          <button type="button" class="mt-tab {% if market_type=='COINM' %}{% else %}active{% endif %}"
-                  data-val="USDM" onclick="setMarket('USDM')">USDM-M</button>
-          <button type="button" class="mt-tab {% if market_type=='COINM' %}active{% endif %}"
-                  data-val="COINM" onclick="setMarket('COINM')">COIN-M</button>
-        </div>
-      </div>
-
       <div class="sb-section">
         <span class="sb-label">Asset</span>
 
         <div class="sf-row">
           <label class="sf-field-label">Symbol</label>
           <select class="sf-input" id="symbolSelect" name="symbol" onchange="autoFetchSymbol(this)">
-            {% if market_type == 'COINM' %}
-              {% for sym in coinm_symbols %}
-              <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
-              {% endfor %}
-            {% else %}
-              {% for sym in available_symbols %}
-              <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
-              {% endfor %}
-            {% endif %}
+            {% for sym in available_symbols %}
+            <option value="{{ sym }}" {% if sym==symbol %}selected{% endif %}>{{ sym }}</option>
+            {% endfor %}
           </select>
         </div>
 
@@ -715,21 +682,7 @@ input[type=range].sf-range::-moz-range-track{
         <div class="sf-row">
           <label class="sf-field-label" id="baseLotsLabel">Base Lots ({{ base_asset }})</label>
           <input class="sf-input mono" type="number" name="base_lots" id="baseLotsInput"
-                 value="{{ base_lots }}" step="{{ lot_step }}" min="{{ lot_min }}"
-                 oninput="updateLotsHint(document.getElementById('marketTypeInput')?.value||'USDM',document.getElementById('symbolSelect')?.value||'',this.value)">
-        </div>
-        {% if market_type == 'COINM' %}
-          {% set _csize = 100 if base_asset == 'BTC' else 10 %}
-          {% set _notional = base_lots * _csize %}
-          {% if price_val and price_val > 0 %}
-            {% set _coins = _notional / price_val %}
-            <div id="lotsHint" class="lots-hint">{{ base_lots | int }} × ${{ _csize }} = {{ "%.4f" | format(_coins) }} {{ base_asset }} (${{ '{:,.2f}'.format(_notional) | replace('.00','') }})</div>
-          {% else %}
-            <div id="lotsHint" class="lots-hint">{{ base_lots | int }} × ${{ _csize }} = ${{ _notional | int }} USD notional — fetch price for {{ base_asset }} amount</div>
-          {% endif %}
-        {% else %}
-          <div id="lotsHint" class="lots-hint" style="display:none"></div>
-        {% endif %}
+                 value="{{ base_lots }}" step="{{ lot_step }}" min="{{ lot_min }}">
 
         <div class="sf-slider-row">
           <div class="sf-slider-head">
@@ -742,7 +695,7 @@ input[type=range].sf-range::-moz-range-track{
         </div>
 
         <div class="sf-row">
-          <label class="sf-field-label" id="capitalLabel">Capital ({{ base_asset if market_type == 'COINM' else 'USD' }})</label>
+          <label class="sf-field-label" id="capitalLabel">Capital (USD)</label>
           <input class="sf-input mono" id="capitalInput" type="number" name="capital" value="{{ capital }}" min="0.001" step="any">
         </div>
 
@@ -812,74 +765,10 @@ input[type=range].sf-range::-moz-range-track{
 // TF auto-update mapping
 const TF_RULE = {{ tf_rule | tojson }};
 
-// USDM / COINM symbol lists (for client-side tab switching)
-const MARKET_SYMBOLS = {
-  'USDM': {{ available_symbols | tojson }},
-  'COINM': {{ coinm_symbols | tojson }},
-};
-
-function getBaseAsset(symbol, marketVal) {
-  if (marketVal === 'COINM') return symbol.replace('USD_PERP', '');
-  return symbol.replace('USDT', '').replace('BUSD', '');
-}
-
-function updateLotsHint(marketVal, symbolVal, lotsVal) {
-  const hint = document.getElementById('lotsHint');
-  if (!hint) return;
-  if (marketVal !== 'COINM') { hint.style.display = 'none'; return; }
-  const base = getBaseAsset(symbolVal || '', marketVal);
-  const cSize = base === 'BTC' ? 100 : 10;
-  const n = parseFloat(lotsVal) || 0;
-  const notional = n * cSize;
-  const price = parseFloat(document.getElementById('priceInput')?.value) || 0;
-  if (price > 0) {
-    const coins = notional / price;
-    const coinStr = coins < 0.01
-      ? coins.toFixed(6)
-      : coins < 1 ? coins.toFixed(4) : coins.toFixed(3);
-    const notionalFmt = notional % 1 === 0
-      ? notional.toLocaleString()
-      : notional.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
-    hint.textContent = `${n} × $${cSize} = ${coinStr} ${base} ($${notionalFmt})`;
-  } else {
-    hint.textContent = `${n} × $${cSize} = $${notional} USD notional — fetch price for ${base} amount`;
-  }
-  hint.style.display = '';
-}
-
-function updateAssetLabels(marketVal, symbolVal) {
-  const base = getBaseAsset(symbolVal || '', marketVal);
-  const capLbl = document.getElementById('capitalLabel');
-  if (capLbl) capLbl.textContent = marketVal === 'COINM' ? `Capital (${base})` : 'Capital (USD)';
+function updateAssetLabels(symbolVal) {
+  const base = (symbolVal || '').replace('USDT', '').replace('BUSD', '');
   const lotsLbl = document.getElementById('baseLotsLabel');
   if (lotsLbl) lotsLbl.textContent = `Base Lots (${base})`;
-  const lotsInp = document.getElementById('baseLotsInput');
-  updateLotsHint(marketVal, symbolVal, lotsInp ? lotsInp.value : 0);
-}
-
-function setMarket(val) {
-  const inp = document.getElementById('marketTypeInput');
-  if (inp) inp.value = val;
-  document.querySelectorAll('.mt-tab').forEach(t =>
-    t.classList.toggle('active', t.dataset.val === val)
-  );
-  // Swap symbol options
-  const sel = document.getElementById('symbolSelect');
-  if (!sel) return;
-  const current = sel.value;
-  const syms = MARKET_SYMBOLS[val] || MARKET_SYMBOLS['USDM'];
-  sel.innerHTML = syms.map(s =>
-    `<option value="${s}"${s === current ? ' selected' : ''}>${s}</option>`
-  ).join('');
-  const newSym = document.getElementById('symbolSelect').value;
-  // Reset capital to mode default
-  const capInp = document.getElementById('capitalInput');
-  if (capInp) capInp.value = val === 'COINM' ? 1 : 1000;
-  // Update asset-dependent labels
-  updateAssetLabels(val, newSym);
-  // Re-fetch price if one was already loaded
-  const priceEl = document.getElementById('priceInput');
-  if (priceEl && priceEl.value) fetchPriceAtr();
 }
 
 function updateAtrTf(sel) {
@@ -900,11 +789,10 @@ function fetchPriceAtr() {
            || document.querySelector('[name=symbol]')?.value || 'SOLUSDT';
   const atrTf = document.getElementById('atrTfHidden').value;
   const period = document.querySelector('[name=atr_period]').value;
-  const marketType = (document.getElementById('marketTypeInput')?.value || 'USDM').toLowerCase();
   const statusEl = document.getElementById('fetchStatus');
   statusEl.textContent = 'Fetching…';
   statusEl.style.color = 'var(--gold)';
-  fetch(`/sim/api/price-atr?symbol=${sym}&atr_tf=${atrTf}&atr_period=${period}&market_type=${marketType}`)
+  fetch(`/sim/api/price-atr?symbol=${sym}&atr_tf=${atrTf}&atr_period=${period}`)
     .then(r => r.json())
     .then(data => {
       if (data.ok) {
@@ -912,10 +800,6 @@ function fetchPriceAtr() {
         document.getElementById('atrInput').value = data.atr;
         statusEl.textContent = `✓ Price: ${data.price.toFixed(4)}  ATR: ${data.atr.toFixed(4)}`;
         statusEl.style.color = 'var(--green)';
-        // Refresh lots hint now that price is known
-        const mkt = document.getElementById('marketTypeInput')?.value || 'USDM';
-        const lotsInp = document.getElementById('baseLotsInput');
-        updateLotsHint(mkt, sym, lotsInp ? lotsInp.value : 0);
       } else {
         statusEl.textContent = '✗ ' + (data.error || 'Failed');
         statusEl.style.color = 'var(--neg)';
@@ -928,10 +812,7 @@ function fetchPriceAtr() {
 }
 
 function autoFetchSymbol(sel) {
-  // Update asset-dependent labels when symbol changes
-  const mkt = document.getElementById('marketTypeInput')?.value || 'USDM';
-  updateAssetLabels(mkt, sel.value);
-  // auto-fetch when symbol changes if price already loaded
+  updateAssetLabels(sel.value);
   const priceEl = document.getElementById('priceInput');
   if (priceEl && priceEl.value) fetchPriceAtr();
 }

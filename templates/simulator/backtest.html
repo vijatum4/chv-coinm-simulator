@@ -198,7 +198,7 @@
       {% if result.total_net_pnl >= 0 %}+{% endif %}{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl) }}
     </div>
     <div class="stat-foot">
-      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%+.1f'|format(growth_pct) }}% on {{ cur }}{{ bt_capital | capfmt }}
+      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.1f'|format(growth_pct|abs) }}% on {{ cur }}{{ bt_capital | capfmt }}
     </div>
   </div>
 

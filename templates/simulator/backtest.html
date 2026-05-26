@@ -195,7 +195,7 @@
   <div class="stat featured{% if result.total_net_pnl < 0 %} neg-pnl{% endif %}">
     <div class="stat-lbl">Total Net P&amp;L</div>
     <div class="stat-val mono">
-      {% if result.total_net_pnl >= 0 %}+{% endif %}{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl) }}
+      {% if result.total_net_pnl >= 0 %}+{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl) }}{% else %}-{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl|abs) }}{% endif %}
     </div>
     <div class="stat-foot">
       {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.1f'|format(growth_pct|abs) }}% on {{ cur }}{{ bt_capital | capfmt }}

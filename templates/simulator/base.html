@@ -852,7 +852,7 @@ function filterLog() {
 }
 
 // Export CSV — client-side from table DOM
-function exportCsv() {
+function exportCsv(btn) {
   var table = document.getElementById('logTable');
   if (!table) return;
   var rows = [];
@@ -867,10 +867,41 @@ function exportCsv() {
       return '"' + td.textContent.trim().replace(/"/g, '""') + '"';
     }).join(','));
   });
+
+  // Build filename from button data attributes
+  var filename = 'chv_backtest.csv';
+  if (btn) {
+    var d = btn.dataset;
+    var sym    = (d.symbol || 'UNKNOWN').replace('USDT','').replace('BUSD','');
+    var tf     = (d.tf     || '').replace('m','m').toUpperCase();
+    var buf    = d.buffer  || '';
+    var rr     = d.rr     || '';
+    var lots   = d.lots    || '';
+    var lev    = d.lev     || '';
+    var cap    = d.capital || '';
+    var days   = d.days    || '';
+    var today  = new Date();
+    var yy  = today.getFullYear();
+    var mm  = String(today.getMonth() + 1).padStart(2, '0');
+    var dd  = String(today.getDate()).padStart(2, '0');
+    // e.g. CHV_BTC_4h_buf0.75_rr3.0_0.25BTC_10x_200k_365d_20260526.csv
+    var capK = cap >= 1000 ? Math.round(cap/1000)+'k' : cap;
+    filename = [
+      'CHV', sym, tf,
+      'buf' + buf,
+      'rr'  + rr,
+      lots  + 'lots',
+      lev   + 'x',
+      capK,
+      days  + 'd',
+      yy + '' + mm + '' + dd
+    ].join('_') + '.csv';
+  }
+
   var blob = new Blob([rows.join('\n')], {type: 'text/csv'});
   var a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = 'chv_backtest.csv';
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);

@@ -684,9 +684,11 @@ input[type=range].sf-range::-moz-range-track{
         <div class="sf-row">
           <label class="sf-field-label" id="baseLotsLabel">Base Lots ({{ base_asset }})</label>
           <input class="sf-input mono" type="number" name="base_lots" id="baseLotsInput"
-                 value="{{ base_lots }}" step="{{ lot_step }}" min="{{ lot_min }}">
+                 value="{{ base_lots }}" step="{{ lot_step }}" min="{{ lot_min }}"
+                 oninput="updateLotsUsd()">
+          <span class="sf-caption" id="lotsUsdNote" style="display:none"></span>
 
-        <div class="sf-slider-row">
+        <div class="sf-slider-row" style="margin-top:12px">
           <div class="sf-slider-head">
             <label class="sf-slider-lbl" for="leverageRange">Leverage</label>
             <span class="sf-slider-badge" id="leverageBadge">{{ leverage }}×</span>
@@ -802,6 +804,7 @@ function fetchPriceAtr() {
         document.getElementById('atrInput').value = data.atr;
         statusEl.textContent = `✓ Price: ${data.price.toFixed(4)}  ATR: ${data.atr.toFixed(4)}`;
         statusEl.style.color = 'var(--green)';
+        updateLotsUsd(data.price);
       } else {
         statusEl.textContent = '✗ ' + (data.error || 'Failed');
         statusEl.style.color = 'var(--neg)';
@@ -905,6 +908,24 @@ function exportCsv(btn) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+function updateLotsUsd(price) {
+  var note = document.getElementById('lotsUsdNote');
+  if (!note) return;
+  if (price === undefined) {
+    var p = parseFloat(document.getElementById('priceInput')?.value);
+    if (!p || isNaN(p)) { note.style.display = 'none'; return; }
+    price = p;
+  }
+  var lots = parseFloat(document.getElementById('baseLotsInput')?.value);
+  if (!lots || isNaN(lots) || lots <= 0) { note.style.display = 'none'; return; }
+  var usd = lots * price;
+  var fmt = usd >= 1000
+    ? '$' + (usd / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+    : '$' + usd.toFixed(2);
+  note.textContent = '≈ ' + fmt + ' notional at live price';
+  note.style.display = 'block';
 }
 
 {% block extra_js %}{% endblock %}

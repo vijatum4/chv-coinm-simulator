@@ -53,6 +53,7 @@ LOT_SPECS = {
     'AVAXUSDT':     (1.0,   1.0,   0),
     'BNBUSDT':      (0.01,  0.01,  2),
     'BTCUSDT':      (0.001, 0.001, 3),
+    'CLUSDT':       (0.01,  0.01,  2),   # Crude Oil (WTI) perpetual
     'DOGEUSDT':     (1.0,   1.0,   0),
     'ETHUSDT':      (0.001, 0.001, 3),
     'FARTCOINUSDT': (0.1,   0.1,   1),

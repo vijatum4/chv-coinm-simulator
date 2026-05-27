@@ -209,7 +209,7 @@ def get_available_symbols(limit: int = 50) -> list:
     on Binance Futures — anything not found is silently dropped.
     """
     PRIORITY = [
-        "AVAXUSDT", "BNBUSDT", "BTCUSDT", "DOGEUSDT", "ETHUSDT",
+        "AVAXUSDT", "BNBUSDT", "BTCUSDT", "CLUSDT", "DOGEUSDT", "ETHUSDT",
         "FARTCOINUSDT", "JTOUSDT", "JUPUSDT", "NEARUSDT", "ONDOUSDT",
         "ORDIUSDT", "SOLUSDT", "SUIUSDT", "XAUUSDT", "XRPUSDT",
     ]

@@ -178,7 +178,35 @@
   <div class="section-sub">{{ '{:,}'.format(total_cycles) }} cycles · {{ '{:,}'.format(total_trades) }} trades</div>
 </div>
 
-<div class="stat-grid">
+{# ── Row 1: P&L, Worst Loss, Fees ────────────────────────────────────── #}
+<div class="stat-grid stat-grid-3">
+
+  <div class="stat featured{% if result.total_net_pnl < 0 %} neg-pnl{% endif %}">
+    <div class="stat-lbl">Total Net P&amp;L</div>
+    <div class="stat-val mono">
+      {% if result.total_net_pnl >= 0 %}+{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl) }}{% else %}-{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl|abs) }}{% endif %}
+    </div>
+    <div class="stat-foot">
+      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.1f'|format(growth_pct|abs) }}% on {{ cur }}{{ bt_capital | capfmt }}
+    </div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-lbl">Worst Cycle Loss</div>
+    <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.worst_intra_loss | abs) }}</div>
+    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cur }}{{ cap_at_worst | capfmt }}</div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-lbl">Total Fees Paid</div>
+    <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.total_fees | abs) }}</div>
+    <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }} t</div>
+  </div>
+
+</div>
+
+{# ── Row 2: Cycles, Win Rate, Avg WS, Max WS ─────────────────────────── #}
+<div class="stat-grid stat-grid-4">
 
   <div class="stat">
     <div class="stat-lbl">Total Cycles</div>
@@ -192,16 +220,6 @@
     <div class="stat-foot">{{ winning }}/{{ total_cycles }}</div>
   </div>
 
-  <div class="stat featured{% if result.total_net_pnl < 0 %} neg-pnl{% endif %}">
-    <div class="stat-lbl">Total Net P&amp;L</div>
-    <div class="stat-val mono">
-      {% if result.total_net_pnl >= 0 %}+{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl) }}{% else %}-{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl|abs) }}{% endif %}
-    </div>
-    <div class="stat-foot">
-      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.1f'|format(growth_pct|abs) }}% on {{ cur }}{{ bt_capital | capfmt }}
-    </div>
-  </div>
-
   <div class="stat">
     <div class="stat-lbl">Avg Whipsaws</div>
     <div class="stat-val mono">{{ result.avg_whipsaws }}</div>
@@ -210,28 +228,16 @@
 
   <div class="stat">
     <div class="stat-lbl">Max Whipsaws</div>
-    <div class="stat-val mono">{{ top6[0] if top6 else 0 }}</div>
+    <div class="stat-val mono">{{ top6[0][0] if top6 else 0 }}</div>
     {% if top6 | length > 1 %}
     <div class="stat-foot muted-foot" style="gap:9px">
       {% for w in top6[1:] %}
-      <span>{{ w }}</span>
+      <span>m ${{ w[1] | capfmt }}</span>
       {% endfor %}
     </div>
     {% else %}
     <div class="stat-note">—</div>
     {% endif %}
-  </div>
-
-  <div class="stat">
-    <div class="stat-lbl">Worst Cycle Loss</div>
-    <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.worst_intra_loss | abs) }}</div>
-    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cur }}{{ cap_at_worst | capfmt }}</div>
-  </div>
-
-  <div class="stat">
-    <div class="stat-lbl">Total Fees Paid</div>
-    <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.total_fees | abs) }}</div>
-    <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }} t</div>
   </div>
 
 </div>

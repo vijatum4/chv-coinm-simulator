@@ -237,9 +237,11 @@ select.sf-input{cursor:pointer;-webkit-appearance:none;appearance:none;
 
 /* ── Stat cards (summary row) ───────────────────────────── */
 .stat-grid{
-  display:grid;grid-template-columns:repeat(7,1fr);
-  grid-template-rows:auto 1fr auto;gap:12px;margin-bottom:20px;
+  display:grid;grid-template-rows:auto 1fr auto;gap:12px;margin-bottom:12px;
 }
+.stat-grid-3{grid-template-columns:repeat(3,1fr)}
+.stat-grid-4{grid-template-columns:repeat(4,1fr)}
+.stat-grid:last-of-type{margin-bottom:20px}
 .stat{
   background:var(--olive-700);border:1px solid var(--line);border-radius:18px;
   padding:18px;position:relative;overflow:hidden;
@@ -490,7 +492,7 @@ svg.chart{width:100%;display:block}
 
 /* ── Responsive ─────────────────────────────────────────── */
 @media(max-width:1100px){
-  .stat-grid{grid-template-columns:repeat(4,1fr)}
+  .stat-grid-3,.stat-grid-4{grid-template-columns:repeat(3,1fr)}
   .split{grid-template-columns:1fr}
   .params{grid-template-columns:repeat(5,1fr)}
   .params .param:nth-child(5n){border-right:0}
@@ -499,7 +501,7 @@ svg.chart{width:100%;display:block}
 @media(max-width:820px){
   .sidebar{display:none}
   .page-wrap{padding:20px 16px 60px}
-  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .stat-grid-3,.stat-grid-4{grid-template-columns:repeat(2,1fr)}
   .stat{grid-row:auto;grid-template-rows:none;display:flex;flex-direction:column;min-height:0}
   .bottom-row{grid-template-columns:1fr}
   .formula-grid{grid-template-columns:1fr}

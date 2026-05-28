@@ -187,14 +187,14 @@
       {% if result.total_net_pnl >= 0 %}+{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl) }}{% else %}-{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl|abs) }}{% endif %}
     </div>
     <div class="stat-foot">
-      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.1f'|format(growth_pct|abs) }}% on {{ cur }}{{ bt_capital | capfmt }}
+      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.1f'|format(growth_pct|abs) }}% on {{ cur }}{{ '{:,.0f}'.format(bt_capital) }}
     </div>
   </div>
 
   <div class="stat">
     <div class="stat-lbl">Worst Cycle Loss</div>
     <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.worst_intra_loss | abs) }}</div>
-    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cur }}{{ cap_at_worst | capfmt }}</div>
+    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cur }}{{ '{:,.0f}'.format(cap_at_worst) }}</div>
   </div>
 
   <div class="stat">
@@ -229,12 +229,8 @@
   <div class="stat">
     <div class="stat-lbl">Max Whipsaws</div>
     <div class="stat-val mono">{{ top6[0][0] if top6 else 0 }}</div>
-    {% if top6 | length > 1 %}
-    <div class="stat-foot muted-foot" style="gap:9px">
-      {% for w in top6[1:] %}
-      <span>m ${{ w[1] | capfmt }}</span>
-      {% endfor %}
-    </div>
+    {% if top6 %}
+    <div class="stat-foot muted-foot">m ${{ top6[0][1] | capfmt }}</div>
     {% else %}
     <div class="stat-note">—</div>
     {% endif %}
@@ -458,8 +454,8 @@
     </div>
     <select class="filter-select" id="exitFilter" onchange="filterLog()">
       <option value="">All Cycles</option>
-      <option value="EXIT_LONG">Exit Long</option>
-      <option value="EXIT_SHORT">Exit Short</option>
+      <option value="EXIT_LONG">Long</option>
+      <option value="EXIT_SHORT">Short</option>
       <option value="STOPPED">Stopped</option>
       <option value="ABORTED">Aborted</option>
       <option value="LIQ">Liquidated</option>
@@ -486,14 +482,15 @@
           <th class="col-num">#</th>
           <th>Capital After</th>
           <th>P&amp;L</th>
+          <th>Position</th>
           <th>Entry</th>
+          <th>TP</th>
           <th>ATR</th>
           <th>LP</th>
           <th>SP</th>
           <th class="num">WS</th>
           <th>Duration</th>
           <th>Worst Loss</th>
-          <th>Exit</th>
           <th>Start</th>
           <th>End</th>
         </tr>
@@ -504,23 +501,24 @@
           <td class="col-num">{{ row.num }}</td>
           <td>{{ row.capital }}</td>
           <td class="{% if row.pnl_zero %}{% elif row.pnl_pos %}pl-pos{% else %}pl-neg{% endif %}">{{ row.pnl_fmt }}</td>
+          <td>
+            <span class="pill {% if row.liq %}liq{% elif 'LONG' in row.exit %}long{% elif 'SHORT' in row.exit %}short{% else %}stopped{% endif %}">
+              {{ row.exit_display }}
+            </span>
+          </td>
           <td>{{ row.entry }}</td>
+          <td style="color:var(--beige-dim)">{{ row.tp }}</td>
           <td>{{ row.atr }}</td>
           <td>{{ row.lp }}</td>
           <td>{{ row.sp }}</td>
           <td class="num" style="color:{% if row.ws==0 %}var(--green){% elif row.ws>=4 %}var(--gold){% else %}var(--beige){% endif %}">{{ row.ws }}</td>
           <td style="color:var(--beige-dim)">{{ row.dur }}</td>
           <td class="{% if row.worst_zero %}{% elif row.worst_neg %}pl-neg{% else %}pl-pos{% endif %}">{{ row.worst }}</td>
-          <td>
-            <span class="pill {% if row.liq %}liq{% elif 'LONG' in row.exit %}long{% elif 'SHORT' in row.exit %}short{% else %}stopped{% endif %}">
-              {{ row.exit_display }}
-            </span>
-          </td>
           <td style="color:var(--beige-dim)">{{ row.start }}</td>
           <td style="color:var(--beige-dim)">{{ row.end }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="13" class="empty-state" style="padding:40px;text-align:center;color:var(--muted)">No cycles yet</td></tr>
+        <tr><td colspan="14" class="empty-state" style="padding:40px;text-align:center;color:var(--muted)">No cycles yet</td></tr>
         {% endfor %}
       </tbody>
     </table>

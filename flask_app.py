@@ -295,14 +295,15 @@ def _build_bt_charts(result, capital: float, cur_sym: str = '$') -> dict:
 
 # Keys match backtest_engine exit_direction values exactly
 _EXIT_DISPLAY = {
-    'EXIT_LONG':  'Exit Long',
-    'EXIT_SHORT': 'Exit Short',
+    'EXIT_LONG':  'LONG',
+    'EXIT_SHORT': 'SHORT',
     'STOPPED':    'Stopped',
     'ABORTED':    'Aborted',
     'LIQ':        'Liquidated',
 }
 
-def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$') -> list:
+def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$',
+                 reward_ratio: float = 2.5) -> list:
     cap = capital
     rows = []
     for c in result.cycles:
@@ -313,6 +314,15 @@ def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$') ->
         aborted = c.exit_direction == 'ABORTED'
         exit_str = 'LIQ' if liq else ('ABORTED' if aborted else c.exit_direction)
         exit_display = _EXIT_DISPLAY.get(exit_str, exit_str.replace('_', ' '))
+        # TP price: LP+d for long, SP−d for short
+        c_param = c.lp - c.sp
+        d_param = reward_ratio * c_param
+        if exit_str == 'EXIT_LONG':
+            tp_fmt = f'{c.lp + d_param:.4f}'
+        elif exit_str == 'EXIT_SHORT':
+            tp_fmt = f'{c.sp - d_param:.4f}'
+        else:
+            tp_fmt = '—'
         rows.append({
             'num': c.cycle_num,
             'capital': f'{cur_sym}{cap:,.2f}',
@@ -321,6 +331,7 @@ def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$') ->
             'pnl_pos': c.net_pnl > 0,
             'pnl_zero': c.net_pnl == 0,
             'entry': f'{c.entry_price:.4f}',
+            'tp': tp_fmt,
             'atr': f'{c.atr_at_entry:.4f}',
             'lp': f'{c.lp:.4f}',
             'sp': f'{c.sp:.4f}',
@@ -611,7 +622,8 @@ def bt_result_view(job_id):
 
     cur_sym = '$'
 
-    log = _prep_bt_log(result, bt_cap, d_job.get('trading_tf', '1h'), cur_sym)
+    log = _prep_bt_log(result, bt_cap, d_job.get('trading_tf', '1h'), cur_sym,
+                       reward_ratio=float(d_job.get('reward_ratio', 2.5)))
     charts = _build_bt_charts(result, bt_cap, cur_sym)
 
     return render_template('simulator/backtest.html',

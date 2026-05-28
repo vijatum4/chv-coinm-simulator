@@ -603,6 +603,43 @@ def bt_result_view(job_id):
     _leverage   = float(d.get('leverage', 10))
     _base_lots  = float(d.get('base_lots', 1.0))
 
+    # ── Liquidation detail ─────────────────────────────────────────────────
+    liq_detail = None
+    if result.liquidated:
+        liq_c = next((c for c in result.cycles if not c.capital_ok), None)
+        if liq_c:
+            ws_n = result.liquidation_step  # whipsaw count at failure
+            last_dir_step = next(
+                (s for s in reversed(liq_c.steps) if s.direction in ('LONG', 'SHORT')), None
+            )
+            last_lots = last_dir_step.lots if last_dir_step else liq_c.base_lots
+            last_dir  = last_dir_step.direction if last_dir_step else 'LONG'
+            # SL price of the position that couldn't invert
+            sl_price  = liq_c.sp if last_dir == 'LONG' else liq_c.lp
+            # Lot size that would have been needed (but couldn't be opened)
+            failed_lots = (round(liq_c.base_lots * 0.5, 6)
+                           if ws_n == 1
+                           else round(last_lots * 1.5, 6))
+            failed_margin = (failed_lots * sl_price) / _leverage
+            # Capital at the START of the liquidation cycle
+            cap_before = bt_cap
+            for c in result.cycles:
+                if c.cycle_num == liq_c.cycle_num:
+                    break
+                cap_before += c.net_pnl
+            shortfall = failed_margin - cap_before
+            liq_detail = {
+                'cycle':         result.liquidation_cycle,
+                'ws':            ws_n,
+                'last_lots':     last_lots,
+                'failed_lots':   failed_lots,
+                'sl_price':      sl_price,
+                'failed_margin': failed_margin,
+                'cap_before':    cap_before,
+                'shortfall':     shortfall,
+                'cum_loss':      result.liquidation_loss,  # negative
+            }
+
     def _ws_peak_margin(cycle):
         N = cycle.whipsaws
         lots = _base_lots if N == 0 else _base_lots * 0.5 * (1.5 ** max(N - 1, 0))
@@ -638,6 +675,7 @@ def bt_result_view(job_id):
                            top6_ws=top6_ws,
                            ws_breakdown=ws_breakdown,
                            cap_at_worst=cap_at_worst,
+                           liq_detail=liq_detail,
                            currency_sym=cur_sym,
                            **_ctx(d, 'backtest'))
 

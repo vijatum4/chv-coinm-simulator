@@ -15,6 +15,15 @@
 
 /* Toolbar: match button height to search/filter */
 .toolbar .btn { padding-top: 7px; padding-bottom: 7px; border-radius: 10px }
+
+/* Liquidation detail cards */
+.liq-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(136px,1fr)); gap:7px; margin-top:14px }
+.liq-card { background:rgba(0,0,0,0.22); border-radius:9px; padding:9px 11px }
+.liq-lbl  { font-size:10px; text-transform:uppercase; letter-spacing:0.08em;
+             color:oklch(0.66 0.18 28 / 0.75); margin-bottom:3px }
+.liq-val  { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600;
+             color:oklch(0.92 0.05 28) }
+.liq-val.liq-bad { color:var(--neg) }
 {% endblock %}
 
 {% block extra_js %}
@@ -161,10 +170,60 @@
 
 {# ── Liquidation / completion banner ─────────────────────────────────── #}
 {% if result.liquidated %}
-<div class="alert alert-red">
-  💀 <strong>Account LIQUIDATED at Cycle {{ result.liquidation_cycle }}</strong> —
-  Whipsaw #{{ result.liquidation_step }}.
-  Reduce base lots, increase capital, or lower leverage to avoid margin blowout.
+<div class="alert alert-red" style="padding:16px 18px">
+  <div style="display:flex;align-items:flex-start;gap:10px">
+    <span style="font-size:20px;line-height:1.1;flex-shrink:0">💀</span>
+    <div>
+      <strong style="font-size:14px">Account LIQUIDATED — Cycle {{ result.liquidation_cycle }}, Whipsaw #{{ result.liquidation_step }}</strong>
+      <div style="font-size:12px;margin-top:3px;color:var(--neg);opacity:0.85">
+        The next inversion required more margin than available capital.
+        Reduce base lots, lower leverage, or increase capital.
+      </div>
+    </div>
+  </div>
+  {% if liq_detail %}
+  <div class="liq-grid">
+    <div class="liq-card">
+      <div class="liq-lbl">Cycle</div>
+      <div class="liq-val">#{{ liq_detail.cycle }}</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">Whipsaw</div>
+      <div class="liq-val">#{{ liq_detail.ws }}</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">Last Position</div>
+      <div class="liq-val">{{ liq_detail.last_lots }} lots</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">Lots Needed</div>
+      <div class="liq-val liq-bad">{{ liq_detail.failed_lots }} lots</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">@ SL Price</div>
+      <div class="liq-val">{{ cur }}{{ '{:,.4f}'.format(liq_detail.sl_price) }}</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">Margin Needed</div>
+      <div class="liq-val liq-bad">{{ cur }}{{ '{:,.2f}'.format(liq_detail.failed_margin) }}</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">Capital Available</div>
+      <div class="liq-val">{{ cur }}{{ '{:,.2f}'.format(liq_detail.cap_before) }}</div>
+    </div>
+    {% if liq_detail.shortfall > 0 %}
+    <div class="liq-card">
+      <div class="liq-lbl">Shortfall</div>
+      <div class="liq-val liq-bad">-{{ cur }}{{ '{:,.2f}'.format(liq_detail.shortfall) }}</div>
+    </div>
+    {% else %}
+    <div class="liq-card">
+      <div class="liq-lbl">Cum. Loss</div>
+      <div class="liq-val liq-bad">-{{ cur }}{{ '{:,.2f}'.format(liq_detail.cum_loss | abs) }}</div>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 {% elif result.data_exhausted %}
 <div class="alert alert-green">

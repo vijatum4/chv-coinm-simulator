@@ -176,7 +176,11 @@
     <div>
       <strong style="font-size:14px">Account LIQUIDATED — Cycle {{ result.liquidation_cycle }}, Whipsaw #{{ result.liquidation_step }}</strong>
       <div style="font-size:12px;margin-top:3px;color:var(--neg);opacity:0.85">
+        {% if liq_detail and liq_detail.reason == 'loss' %}
+        Cumulative whipsaw losses ({{ cur }}{{ '{:,.2f}'.format(liq_detail.cum_loss | abs) }}) exceeded available capital — the account went negative before the next inversion could be placed.
+        {% else %}
         The next inversion required more margin than available capital.
+        {% endif %}
         Reduce base lots, lower leverage, or increase capital.
       </div>
     </div>
@@ -197,7 +201,7 @@
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Lots Needed</div>
-      <div class="liq-val liq-bad">{{ liq_detail.failed_lots }} lots</div>
+      <div class="liq-val{% if liq_detail.reason == 'margin' %} liq-bad{% endif %}">{{ liq_detail.failed_lots }} lots</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">@ SL Price</div>
@@ -205,21 +209,21 @@
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Margin Needed</div>
-      <div class="liq-val liq-bad">{{ cur }}{{ '{:,.2f}'.format(liq_detail.failed_margin) }}</div>
+      <div class="liq-val{% if liq_detail.reason == 'margin' %} liq-bad{% endif %}">{{ cur }}{{ '{:,.2f}'.format(liq_detail.failed_margin) }}</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Capital Available</div>
       <div class="liq-val">{{ cur }}{{ '{:,.2f}'.format(liq_detail.cap_before) }}</div>
     </div>
-    {% if liq_detail.shortfall > 0 %}
+    {% if liq_detail.reason == 'margin' %}
     <div class="liq-card">
       <div class="liq-lbl">Shortfall</div>
       <div class="liq-val liq-bad">-{{ cur }}{{ '{:,.2f}'.format(liq_detail.shortfall) }}</div>
     </div>
     {% else %}
     <div class="liq-card">
-      <div class="liq-lbl">Cum. Loss</div>
-      <div class="liq-val liq-bad">-{{ cur }}{{ '{:,.2f}'.format(liq_detail.cum_loss | abs) }}</div>
+      <div class="liq-lbl">Loss vs Capital</div>
+      <div class="liq-val liq-bad">-{{ cur }}{{ '{:,.2f}'.format(liq_detail.net_remaining | abs) }} over</div>
     </div>
     {% endif %}
   </div>

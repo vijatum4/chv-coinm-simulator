@@ -628,6 +628,11 @@ def bt_result_view(job_id):
                     break
                 cap_before += c.net_pnl
             shortfall = failed_margin - cap_before
+            cum_loss  = result.liquidation_loss          # negative number
+            # Determine which engine condition actually fired:
+            # A) margin_needed > capital  →  shortfall > 0
+            # B) abs(balance) > capital   →  abs(cum_loss) > cap_before
+            reason = 'margin' if shortfall > 0 else 'loss'
             liq_detail = {
                 'cycle':         result.liquidation_cycle,
                 'ws':            ws_n,
@@ -637,7 +642,9 @@ def bt_result_view(job_id):
                 'failed_margin': failed_margin,
                 'cap_before':    cap_before,
                 'shortfall':     shortfall,
-                'cum_loss':      result.liquidation_loss,  # negative
+                'cum_loss':      cum_loss,
+                'net_remaining': cap_before + cum_loss,  # negative when losses > capital
+                'reason':        reason,
             }
 
     def _ws_peak_margin(cycle):

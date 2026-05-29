@@ -112,6 +112,7 @@ def _sidebar_defaults():
         base_asset='SOL',
         dual_atr_on=False,
         atr_period_2=14,
+        min_notional_on=False,
     )
 
 
@@ -148,7 +149,7 @@ def _parse_sidebar(form, sess):
     if 'capital' not in form and 'capital' not in sess:
         d['capital'] = 1000.0
 
-    for key in ('ws_limit_on', 'atr_guard_on', 'use_live', 'dual_atr_on'):
+    for key in ('ws_limit_on', 'atr_guard_on', 'use_live', 'dual_atr_on', 'min_notional_on'):
         # When a form is submitted, absent checkbox = explicitly unchecked.
         # Only fall back to session on GET (form is empty {}).
         val = form.get(key, '') if form else src.get(key, '')
@@ -469,6 +470,7 @@ def _bt_worker(job_id: str):
             max_whipsaws=d['ws_limit'] if d['ws_limit_on'] else 0,
             atr_guard=d.get('atr_guard_on', True),
             atr_guard_multiplier=d.get('atr_guard_multiplier', 1.0),
+            min_notional_on=bool(d.get('min_notional_on', False)),
         )
         upd(92, 'Saving CSV…')
         _save_bt_csv(result, d)
@@ -654,6 +656,23 @@ def bt_result_view(job_id):
                 'reason':        reason,
             }
 
+    # ── Min notional detail ────────────────────────────────────────────────
+    mn_detail = None
+    if result.min_notional_rejected:
+        step = LOT_SPECS.get(d.get('symbol', ''), (0.001, 0.001, 3))[1]
+        inv_lots_val = round(_base_lots * 0.5, 6)
+        inv_lots_fmt = f'{inv_lots_val:.{_lot_dec}f}'
+        min_base = math.ceil((10.0 / result.min_notional_price) / step) * step
+        min_base_fmt = f'{min_base:.{_lot_dec}f}'
+        mn_detail = {
+            'cycle':       result.min_notional_cycle,
+            'entry_price': result.min_notional_price,
+            'inv_lots':    inv_lots_fmt,
+            'inv_notional': result.min_notional_inv_notional,
+            'min_base':    min_base_fmt,
+            'completed':   result.total_cycles,
+        }
+
     def _ws_peak_info(cycle):
         N = cycle.whipsaws
         lots = _base_lots if N == 0 else _base_lots * 0.5 * (1.5 ** max(N - 1, 0))
@@ -698,6 +717,7 @@ def bt_result_view(job_id):
                            ws_breakdown=ws_breakdown,
                            cap_at_worst=cap_at_worst,
                            liq_detail=liq_detail,
+                           mn_detail=mn_detail,
                            currency_sym=cur_sym,
                            **_ctx(d, 'backtest'))
 

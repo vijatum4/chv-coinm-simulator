@@ -742,7 +742,13 @@ input[type=range].sf-range::-moz-range-track{
                  value="{{ base_lots }}" step="{{ lot_step }}" min="{{ lot_min }}"
                  oninput="updateLotsUsd()">
         </div>
-        <div id="lotsUsdNote" style="display:none;font-size:10.5px;color:var(--muted);margin-top:-2px;margin-bottom:10px;line-height:1.4"></div>
+        <div id="lotsUsdNote" style="display:none;font-size:10.5px;color:var(--muted);margin-top:-2px;margin-bottom:4px;line-height:1.4"></div>
+        <label class="sf-toggle" style="margin-bottom:10px">
+          <input type="checkbox" name="min_notional_on" id="minNotionalCheck"
+                 {% if min_notional_on %}checked{% endif %}
+                 onchange="updateLotsUsd()">
+          <span class="sf-toggle-lbl">Binance $5 Min Notional</span>
+        </label>
 
         <div class="sf-slider-row">
           <div class="sf-slider-head">
@@ -935,6 +941,7 @@ function fetchPriceAtr() {
   }
 })();
 
+
 function autoFetchSymbol(sel) {
   updateAssetLabels(sel.value);
   const priceEl = document.getElementById('priceInput');
@@ -1067,7 +1074,22 @@ function updateLotsUsd(price) {
   var fmt = usd >= 1000
     ? '$' + (usd / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
     : '$' + usd.toFixed(2);
-  note.textContent = '≈ ' + fmt + ' notional at live price';
+  var html = '≈ ' + fmt + ' notional';
+  var min5On = document.getElementById('minNotionalCheck')?.checked;
+  if (min5On) {
+    var step = {{ lot_step }};
+    var dec  = {{ lot_dec }};
+    var invNotional = lots * 0.5 * price;
+    if (invNotional < 5) {
+      var minBase = Math.ceil((10 / price) / step) * step;
+      html += '<br><span style="color:var(--gold)">⚠ WS1 inversion $' + invNotional.toFixed(2)
+            + ' &lt; $5 min — need ≥ ' + minBase.toFixed(dec) + ' lots</span>';
+    } else {
+      html += '<br><span style="color:var(--green)">✓ WS1 inversion $' + invNotional.toFixed(2)
+            + ' meets $5 min</span>';
+    }
+  }
+  note.innerHTML = html;
   note.style.display = 'block';
 }
 

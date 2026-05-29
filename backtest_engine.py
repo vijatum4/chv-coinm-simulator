@@ -74,6 +74,10 @@ class BacktestResult:
     liquidation_step: int         # whipsaw step inside that cycle
     liquidation_loss: float       # accumulated loss at point of liquidation
     data_exhausted: bool          # True if backtest ran out of candles naturally
+    min_notional_rejected: bool   # True if a cycle was stopped by Binance $5 minimum
+    min_notional_cycle: int       # cycle number that triggered the rejection
+    min_notional_price: float     # entry price at the rejected cycle
+    min_notional_inv_notional: float  # actual inv_lots × inv_price computed
     equity_curve: List[float]
     cycle_pnls: List[float]
     cycles: List[Cycle]
@@ -273,6 +277,7 @@ def run_backtest(
     max_whipsaws: int = 0,
     atr_guard: bool = True,
     atr_guard_multiplier: float = 1.0,
+    min_notional_on: bool = False,  # enforce Binance $5 min notional on WS1 inversion
 ) -> BacktestResult:
     from chv_engine import calculate_params
 
@@ -294,6 +299,12 @@ def run_backtest(
     # same direction as the previous exit (momentum continuation).
     start_direction = "LONG"
 
+    # Min notional tracking
+    mn_rejected = False
+    mn_cycle    = 0
+    mn_price    = 0.0
+    mn_notional = 0.0
+
     while i < len(trading_candles) - 1:
         # ATR from macro TF aligned to current position
         aligned = align_atr_candles(trading_candles, atr_candles, i)
@@ -313,6 +324,18 @@ def run_backtest(
 
         entry_price = trading_candles[i].close
         params = calculate_params(symbol, entry_price, atr_val, buffer, reward_ratio, atr_guard_multiplier)
+
+        # Binance $5 min notional check: WS1 inversion lot × inversion price must ≥ $5.
+        # WS1 lot = base_lots × 0.5; inversion price = SP (for LONG) or LP (for SHORT).
+        if min_notional_on:
+            inv_lots  = round(base_lots * 0.5, 6)
+            inv_price = params.sp if start_direction == 'LONG' else params.lp
+            if inv_lots * inv_price < 5.0:
+                mn_rejected = True
+                mn_cycle    = cycle_num + 1
+                mn_price    = entry_price
+                mn_notional = round(inv_lots * inv_price, 4)
+                break
 
         # ATR Guard: compare footprint to trading TF ATR (not macro ATR).
         # Macro ATR sizes the bracket; trading TF ATR reflects how much price
@@ -444,7 +467,11 @@ def run_backtest(
         liquidation_cycle=liq_cycle_obj.cycle_num if liq_cycle_obj else 0,
         liquidation_step=len([s for s in liq_cycle_obj.steps if s.direction in ("LONG","SHORT")]) if liq_cycle_obj else 0,
         liquidation_loss=liq_cycle_obj.net_pnl if liq_cycle_obj else 0.0,
-        data_exhausted=(not liquidated),
+        data_exhausted=(not liquidated and not mn_rejected),
+        min_notional_rejected=mn_rejected,
+        min_notional_cycle=mn_cycle,
+        min_notional_price=mn_price,
+        min_notional_inv_notional=mn_notional,
         equity_curve=equity_curve,
         cycle_pnls=cycle_pnls,
         cycles=cycles,

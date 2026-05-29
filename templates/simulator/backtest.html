@@ -232,6 +232,47 @@
   </div>
   {% endif %}
 </div>
+{% elif result.min_notional_rejected %}
+<div class="alert alert-red" style="padding:16px 18px">
+  <div style="display:flex;align-items:flex-start;gap:10px">
+    <span style="font-size:20px;line-height:1.1;flex-shrink:0">🚫</span>
+    <div>
+      <strong style="font-size:14px">Order Rejected — Cycle #{{ result.min_notional_cycle }} would not meet Binance $5 min notional</strong>
+      <div style="font-size:12px;margin-top:3px;color:var(--neg);opacity:0.85">
+        The WS1 inversion lot at this cycle's price falls below Binance's $5 minimum notional requirement — the order would be rejected in live trading.
+        Increase base lots or wait for a higher-priced entry.
+      </div>
+    </div>
+  </div>
+  {% if mn_detail %}
+  <div class="liq-grid">
+    <div class="liq-card">
+      <div class="liq-lbl">Stopped At Cycle</div>
+      <div class="liq-val">#{{ mn_detail.cycle }}</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">Entry Price</div>
+      <div class="liq-val">{{ cur }}{{ '{:,.4f}'.format(mn_detail.entry_price) }}</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">WS1 Inv Lots</div>
+      <div class="liq-val liq-bad">{{ mn_detail.inv_lots }} lots</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">WS1 Notional</div>
+      <div class="liq-val liq-bad">{{ cur }}{{ '{:,.4f}'.format(mn_detail.inv_notional) }}</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">Min Base Lots</div>
+      <div class="liq-val">{{ mn_detail.min_base }} lots</div>
+    </div>
+    <div class="liq-card">
+      <div class="liq-lbl">Cycles Completed</div>
+      <div class="liq-val">{{ mn_detail.completed }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
 {% elif result.data_exhausted %}
 <div class="alert alert-green">
   ✅ Backtest completed the full {{ bt_days }}-day period — capital held throughout all {{ total_cycles }} cycles.

@@ -904,13 +904,15 @@ def api_price_atr():
     try:
         if bt_days > 0:
             import time as _time
-            as_of_ts = int(_time.time() * 1000) - bt_days * 86_400_000
+            raw_ts   = int(_time.time() * 1000) - bt_days * 86_400_000
+            # Snap to midnight UTC so as_of_date is deterministic
+            midnight = (raw_ts // 86_400_000) * 86_400_000
             price, atr1, err, atr2 = fetch_price_and_atr_as_of(
-                sym, atr_tf, period, as_of_ts=as_of_ts, atr_period_2=period_2)
+                sym, atr_tf, period, as_of_ts=midnight, atr_period_2=period_2)
             if err:
                 return jsonify({'ok': False, 'error': err})
             as_of_date = datetime.datetime.utcfromtimestamp(
-                as_of_ts / 1000).strftime('%Y-%m-%d')
+                midnight / 1000).strftime('%Y-%m-%d')
             if period_2 > 0 and atr2:
                 atr_used = min(atr1, atr2)
                 return jsonify({'ok': True, 'price': price,

@@ -106,9 +106,11 @@ def fetch_price_and_atr_as_of(
 ) -> Tuple[Optional[float], Optional[float], Optional[str], Optional[float]]:
     """
     Returns (price, atr1, error, atr2_or_None).
-    Fetches klines ending at `as_of_ts` (ms epoch) to calculate price + ATR
-    at the start of a backtest window. Price = close of the last candle before
-    as_of_ts. If as_of_ts == 0 falls back to the live fetch.
+    Snaps as_of_ts to midnight UTC of the backtest start date, then fetches
+    the first `atr_period` candles from that midnight — so ATR is always
+    computed from the same bars (e.g. 00:00–05:00 for 1h/period-5) regardless
+    of what time of day the button is clicked.
+    If as_of_ts == 0 falls back to the live fetch.
     """
     if as_of_ts <= 0:
         price, atr1, err = fetch_price_and_atr(symbol, atr_timeframe, atr_period, market_type)
@@ -141,8 +143,12 @@ def fetch_price_and_atr_as_of(
     }
     interval_ms = interval_ms_map.get(interval, 14_400_000)
 
-    need = max(atr_period, atr_period_2 if atr_period_2 > 0 else 0) + 10
-    start_ms = as_of_ts - need * interval_ms
+    # Snap to midnight UTC of the backtest start date so result is
+    # deterministic (independent of what time the button is clicked).
+    ms_per_day = 86_400_000
+    midnight_ms = (as_of_ts // ms_per_day) * ms_per_day
+
+    need = max(atr_period, atr_period_2 if atr_period_2 > 0 else 0) + 2
 
     if is_coinm:
         urls = ["https://dapi.binance.com/dapi/v1/klines"]
@@ -157,7 +163,7 @@ def fetch_price_and_atr_as_of(
         try:
             r = requests.get(url, params={
                 "symbol": symbol, "interval": interval,
-                "startTime": start_ms, "endTime": as_of_ts,
+                "startTime": midnight_ms,
                 "limit": need,
             }, timeout=6)
             data = r.json()
@@ -170,7 +176,7 @@ def fetch_price_and_atr_as_of(
     if klines is None:
         return None, None, f"Could not fetch historical candles for {symbol}", None
 
-    # Price = close of the last complete candle at/before as_of_ts
+    # Price = close of the last candle fetched (end of the ATR window)
     price = float(klines[-1][4])
 
     def _calc_atr(candles, period):

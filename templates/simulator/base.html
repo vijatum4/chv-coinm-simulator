@@ -671,23 +671,20 @@ input[type=range].sf-range::-moz-range-track{
                    min="2" max="30" step="1" value="{{ atr_period_2 }}"
                    oninput="document.getElementById('atrPeriod2Badge').textContent=this.value">
           </div>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;margin-bottom:2px">
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px;margin-bottom:2px">
             <span class="sf-caption" style="margin:0">Use:</span>
-            <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:6px;overflow:hidden;flex:1">
-              <button type="button" id="dualAtrModeMin" onclick="setDualAtrMode('min')"
-                      style="flex:1;padding:4px 0;font-size:11px;font-weight:{% if dual_atr_mode != 'max' %}600{% else %}400{% endif %};border:none;cursor:pointer;
-                             background:{% if dual_atr_mode != 'max' %}var(--green){% else %}var(--card-2){% endif %};
-                             color:{% if dual_atr_mode != 'max' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
-                Min ATR
-              </button>
-              <button type="button" id="dualAtrModeMax" onclick="setDualAtrMode('max')"
-                      style="flex:1;padding:4px 0;font-size:11px;font-weight:{% if dual_atr_mode == 'max' %}600{% else %}400{% endif %};border:none;
-                             border-left:1px solid var(--border);cursor:pointer;
-                             background:{% if dual_atr_mode == 'max' %}var(--gold){% else %}var(--card-2){% endif %};
-                             color:{% if dual_atr_mode == 'max' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
-                Max ATR
-              </button>
-            </div>
+            <button type="button" id="dualAtrModeMin" onclick="setDualAtrMode('min')"
+                    style="padding:2px 9px;font-size:10px;font-weight:700;border:none;border-radius:20px;cursor:pointer;letter-spacing:0.04em;
+                           background:{% if dual_atr_mode != 'max' %}var(--green){% else %}rgba(255,255,255,0.07){% endif %};
+                           color:{% if dual_atr_mode != 'max' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
+              MIN
+            </button>
+            <button type="button" id="dualAtrModeMax" onclick="setDualAtrMode('max')"
+                    style="padding:2px 9px;font-size:10px;font-weight:700;border:none;border-radius:20px;cursor:pointer;letter-spacing:0.04em;
+                           background:{% if dual_atr_mode == 'max' %}var(--gold){% else %}rgba(255,255,255,0.07){% endif %};
+                           color:{% if dual_atr_mode == 'max' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
+              MAX
+            </button>
           </div>
           <input type="hidden" name="dual_atr_mode" id="dualAtrModeInput" value="{{ dual_atr_mode }}">
         </div>
@@ -987,11 +984,11 @@ function setDualAtrMode(mode) {
   if (input) input.value = mode;
   if (minBtn && maxBtn) {
     if (mode === 'min') {
-      minBtn.style.background = 'var(--green)'; minBtn.style.color = '#000'; minBtn.style.fontWeight = '600';
-      maxBtn.style.background = 'var(--card-2)'; maxBtn.style.color = 'var(--muted)'; maxBtn.style.fontWeight = '400';
+      minBtn.style.background = 'var(--green)';           minBtn.style.color = '#000';          minBtn.style.fontWeight = '700';
+      maxBtn.style.background = 'rgba(255,255,255,0.07)'; maxBtn.style.color = 'var(--muted)';  maxBtn.style.fontWeight = '700';
     } else {
-      maxBtn.style.background = 'var(--gold)'; maxBtn.style.color = '#000'; maxBtn.style.fontWeight = '600';
-      minBtn.style.background = 'var(--card-2)'; minBtn.style.color = 'var(--muted)'; minBtn.style.fontWeight = '400';
+      maxBtn.style.background = 'var(--gold)';            maxBtn.style.color = '#000';           maxBtn.style.fontWeight = '700';
+      minBtn.style.background = 'rgba(255,255,255,0.07)'; minBtn.style.color = 'var(--muted)';   minBtn.style.fontWeight = '700';
     }
   }
 }

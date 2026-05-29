@@ -281,6 +281,7 @@ def run_backtest(
     min_notional_on: bool = False,  # enforce Binance $5 min notional on WS1 inversion
     fixed_margin: float = 0.0,      # >0 = fixed USD margin per cycle; lots computed dynamically
     lot_step: float = 0.001,        # symbol lot step for rounding in fixed-margin mode
+    dual_atr_mode: str = 'min',     # 'min' or 'max' — which ATR to use when dual is active
 ) -> BacktestResult:
     from chv_engine import calculate_params
 
@@ -323,7 +324,7 @@ def run_backtest(
         if atr_period_2 > 0 and len(aligned) >= atr_period_2 + 1:
             atr_val_2 = calc_atr(aligned, atr_period_2)
             if atr_val_2 > 0:
-                atr_val = min(atr_val, atr_val_2)
+                atr_val = min(atr_val, atr_val_2) if dual_atr_mode == 'min' else max(atr_val, atr_val_2)
 
         entry_price = trading_candles[i].close
         params = calculate_params(symbol, entry_price, atr_val, buffer, reward_ratio, atr_guard_multiplier)

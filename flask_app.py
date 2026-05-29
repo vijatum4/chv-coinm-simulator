@@ -112,6 +112,7 @@ def _sidebar_defaults():
         base_asset='SOL',
         dual_atr_on=False,
         atr_period_2=14,
+        dual_atr_mode='min',
         min_notional_on=False,
         fixed_margin_on=False,
         target_margin=50.0,
@@ -126,7 +127,7 @@ def _parse_sidebar(form, sess):
     d['symbol'] = sym
     d['base_asset'] = sym.replace('USDT', '').replace('BUSD', '')
 
-    for key in ('trading_tf', 'atr_tf'):
+    for key in ('trading_tf', 'atr_tf', 'dual_atr_mode'):
         if src.get(key):
             d[key] = src[key]
 
@@ -463,6 +464,7 @@ def _bt_worker(job_id: str):
             atr_candles=atr_candles,
             atr_period=int(d['atr_period']),
             atr_period_2=int(d['atr_period_2']) if d.get('dual_atr_on') else 0,
+            dual_atr_mode=d.get('dual_atr_mode', 'min'),
             base_lots=d['base_lots'],
             leverage=int(d['leverage']),
             capital=d['capital'],

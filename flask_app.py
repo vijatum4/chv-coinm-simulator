@@ -15,7 +15,8 @@ sys.path.insert(0, str(SIM_DIR))
 from chv_engine import calculate_params, simulate, optimize, generate_bot_config, CHVParams, SimResult
 from backtest_engine import run_backtest
 from data_fetcher import (fetch_historical_ohlcv, klines_to_candles,
-                          fetch_price_and_atr, get_available_symbols)
+                          fetch_price_and_atr, fetch_price_and_atr_as_of,
+                          get_available_symbols)
 
 app = Flask(__name__, template_folder=str(SIM_DIR / 'templates'),
             static_folder=str(SIM_DIR / 'static'))
@@ -899,7 +900,26 @@ def api_price_atr():
     atr_tf   = request.args.get('atr_tf', '4h')
     period   = int(request.args.get('atr_period', 5))
     period_2 = int(request.args.get('atr_period_2', 0))
+    bt_days  = int(request.args.get('bt_days', 0))
     try:
+        if bt_days > 0:
+            import time as _time
+            as_of_ts = int(_time.time() * 1000) - bt_days * 86_400_000
+            price, atr1, err, atr2 = fetch_price_and_atr_as_of(
+                sym, atr_tf, period, as_of_ts=as_of_ts, atr_period_2=period_2)
+            if err:
+                return jsonify({'ok': False, 'error': err})
+            as_of_date = datetime.datetime.utcfromtimestamp(
+                as_of_ts / 1000).strftime('%Y-%m-%d')
+            if period_2 > 0 and atr2:
+                atr_used = min(atr1, atr2)
+                return jsonify({'ok': True, 'price': price,
+                                'atr': round(atr_used, 6),
+                                'atr1': atr1, 'atr2': atr2,
+                                'as_of_date': as_of_date})
+            return jsonify({'ok': True, 'price': price, 'atr': atr1,
+                            'as_of_date': as_of_date})
+        # ── live fetch ──────────────────────────────────────────────────────
         price, atr1, err = fetch_price_and_atr(sym, atr_tf, period)
         if err:
             return jsonify({'ok': False, 'error': err})

@@ -96,6 +96,103 @@ def fetch_price_and_atr(
     return current_price, round(atr, 6), None
 
 
+def fetch_price_and_atr_as_of(
+    symbol: str,
+    atr_timeframe: str = "4h",
+    atr_period: int = 5,
+    as_of_ts: int = 0,
+    market_type: str = 'usdm',
+    atr_period_2: int = 0,
+) -> Tuple[Optional[float], Optional[float], Optional[str], Optional[float]]:
+    """
+    Returns (price, atr1, error, atr2_or_None).
+    Fetches klines ending at `as_of_ts` (ms epoch) to calculate price + ATR
+    at the start of a backtest window. Price = close of the last candle before
+    as_of_ts. If as_of_ts == 0 falls back to the live fetch.
+    """
+    if as_of_ts <= 0:
+        price, atr1, err = fetch_price_and_atr(symbol, atr_timeframe, atr_period, market_type)
+        atr2 = None
+        if atr_period_2 > 0 and not err:
+            _, atr2, _ = fetch_price_and_atr(symbol, atr_timeframe, atr_period_2, market_type)
+        return price, atr1, err, atr2
+
+    try:
+        import requests
+    except ImportError:
+        return None, None, "requests library not installed. Run: pip install requests", None
+
+    symbol = symbol.upper().replace("/", "").replace("-", "")
+    is_coinm = market_type.lower() == 'coinm'
+
+    tf_map = {
+        "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
+        "1h": "1h", "2h": "2h", "4h": "4h", "6h": "6h",
+        "8h": "8h", "12h": "12h", "1d": "1d", "3d": "3d", "1w": "1w",
+    }
+    interval = tf_map.get(atr_timeframe.lower(), "4h")
+
+    interval_ms_map = {
+        "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+        "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000,
+        "4h": 14_400_000, "6h": 21_600_000, "8h": 28_800_000,
+        "12h": 43_200_000, "1d": 86_400_000, "3d": 259_200_000,
+        "1w": 604_800_000,
+    }
+    interval_ms = interval_ms_map.get(interval, 14_400_000)
+
+    need = max(atr_period, atr_period_2 if atr_period_2 > 0 else 0) + 10
+    start_ms = as_of_ts - need * interval_ms
+
+    if is_coinm:
+        urls = ["https://dapi.binance.com/dapi/v1/klines"]
+    else:
+        urls = [
+            "https://fapi.binance.com/fapi/v1/klines",
+            "https://api.binance.com/api/v3/klines",
+        ]
+
+    klines = None
+    for url in urls:
+        try:
+            r = requests.get(url, params={
+                "symbol": symbol, "interval": interval,
+                "startTime": start_ms, "endTime": as_of_ts,
+                "limit": need,
+            }, timeout=6)
+            data = r.json()
+            if isinstance(data, list) and len(data) >= 2:
+                klines = data
+                break
+        except Exception:
+            continue
+
+    if klines is None:
+        return None, None, f"Could not fetch historical candles for {symbol}", None
+
+    # Price = close of the last complete candle at/before as_of_ts
+    price = float(klines[-1][4])
+
+    def _calc_atr(candles, period):
+        trs = []
+        for i in range(1, len(candles)):
+            high       = float(candles[i][2])
+            low        = float(candles[i][3])
+            prev_close = float(candles[i - 1][4])
+            tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+            trs.append(tr)
+        if len(trs) < period:
+            return None
+        return round(statistics.mean(trs[-period:]), 6)
+
+    atr1 = _calc_atr(klines, atr_period)
+    if atr1 is None:
+        return price, None, "Not enough historical candles to compute ATR.", None
+
+    atr2 = _calc_atr(klines, atr_period_2) if atr_period_2 > 0 else None
+    return price, atr1, None, atr2
+
+
 def fetch_historical_ohlcv(
     symbol: str,
     interval: str,

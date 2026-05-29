@@ -674,8 +674,23 @@ input[type=range].sf-range::-moz-range-track{
           <div class="sf-caption" style="margin-top:-4px">Uses min(ATR1, ATR2) per cycle</div>
         </div>
 
+        {% if mode == 'backtest' %}
+        <div id="fetchModeWrap" style="display:flex;gap:0;margin-bottom:6px;border:1px solid var(--border);border-radius:7px;overflow:hidden">
+          <button type="button" id="fetchModeLive" onclick="setFetchMode('live')"
+                  style="flex:1;padding:5px 0;font-size:11px;font-weight:600;border:none;cursor:pointer;
+                         background:var(--green);color:#000;transition:background 0.15s,color 0.15s">
+            Live
+          </button>
+          <button type="button" id="fetchModePeriod" onclick="setFetchMode('period')"
+                  style="flex:1;padding:5px 0;font-size:11px;font-weight:500;border:none;
+                         border-left:1px solid var(--border);cursor:pointer;
+                         background:var(--card-2);color:var(--muted);transition:background 0.15s,color 0.15s">
+            Period Start
+          </button>
+        </div>
+        {% endif %}
         <div style="display:flex;gap:8px;margin-bottom:8px">
-          <button type="button" class="btn btn-green" style="flex:1;justify-content:center;font-size:12px;padding:8px"
+          <button type="button" id="fetchBtn" class="btn btn-green" style="flex:1;justify-content:center;font-size:12px;padding:8px"
                   onclick="fetchPriceAtr()">⬇ Fetch Live</button>
         </div>
 
@@ -829,6 +844,35 @@ function toggleSection(id, checkbox) {
   if (el) el.style.display = checkbox.checked ? '' : 'none';
 }
 
+var _fetchMode = 'live';
+
+function setFetchMode(mode) {
+  _fetchMode = mode;
+  const liveBtn   = document.getElementById('fetchModeLive');
+  const periodBtn = document.getElementById('fetchModePeriod');
+  const fetchBtn  = document.getElementById('fetchBtn');
+  if (liveBtn && periodBtn) {
+    if (mode === 'live') {
+      liveBtn.style.background   = 'var(--green)';
+      liveBtn.style.color        = '#000';
+      liveBtn.style.fontWeight   = '600';
+      periodBtn.style.background = 'var(--card-2)';
+      periodBtn.style.color      = 'var(--muted)';
+      periodBtn.style.fontWeight = '500';
+    } else {
+      periodBtn.style.background = 'var(--gold)';
+      periodBtn.style.color      = '#000';
+      periodBtn.style.fontWeight = '600';
+      liveBtn.style.background   = 'var(--card-2)';
+      liveBtn.style.color        = 'var(--muted)';
+      liveBtn.style.fontWeight   = '500';
+    }
+  }
+  if (fetchBtn) {
+    fetchBtn.textContent = mode === 'period' ? '⬇ Fetch Period Start' : '⬇ Fetch Live';
+  }
+}
+
 function fetchPriceAtr() {
   const sym = document.getElementById('symbolSelect')?.value
            || document.querySelector('[name=symbol]')?.value || 'SOLUSDT';
@@ -837,28 +881,39 @@ function fetchPriceAtr() {
   const dualOn = document.getElementById('dualAtrCheck')?.checked;
   const period2 = dualOn ? (document.getElementById('atrPeriod2Range')?.value || 0) : 0;
   const statusEl = document.getElementById('fetchStatus');
-  statusEl.textContent = 'Fetching…';
+  const isPeriod = _fetchMode === 'period';
+  statusEl.textContent = isPeriod ? 'Fetching period start…' : 'Fetching…';
   statusEl.style.color = 'var(--gold)';
   let url = `/sim/api/price-atr?symbol=${sym}&atr_tf=${atrTf}&atr_period=${period}`;
   if (period2) url += `&atr_period_2=${period2}`;
+  if (isPeriod) {
+    const btDaysEl = document.querySelector('[name=bt_days]');
+    const btDays = btDaysEl ? parseInt(btDaysEl.value) || 365 : 365;
+    url += `&bt_days=${btDays}`;
+  }
   fetch(url)
     .then(r => r.json())
     .then(data => {
       if (data.ok) {
         document.getElementById('priceInput').value = data.price;
         document.getElementById('atrInput').value = data.atr;
+        const asOf = data.as_of_date
+          ? `<span style="color:var(--gold);font-size:10px"> · as of ${data.as_of_date}</span>`
+          : '';
         if (data.atr2 != null) {
           const used1 = data.atr1 <= data.atr2;
           const fmt = v => v.toFixed(4);
+          const lineColor = data.as_of_date ? 'var(--gold)' : 'var(--beige)';
           statusEl.innerHTML =
-            `✓ Price: ${data.price.toFixed(4)}<br>` +
+            `✓ Price: ${data.price.toFixed(4)}${asOf}<br>` +
             `ATR[${period}]: <span style="color:${used1 ? 'var(--green)' : 'var(--beige-dim)'};font-weight:${used1 ? 700 : 400}">${fmt(data.atr1)}</span>` +
             `&nbsp;&nbsp;ATR[${period2}]: <span style="color:${!used1 ? 'var(--green)' : 'var(--beige-dim)'};font-weight:${!used1 ? 700 : 400}">${fmt(data.atr2)}</span>` +
             ` <span style="color:var(--muted);font-size:10px">→ using ${fmt(data.atr)}</span>`;
-          statusEl.style.color = 'var(--beige)';
+          statusEl.style.color = lineColor;
         } else {
-          statusEl.textContent = `✓ Price: ${data.price.toFixed(4)}  ATR: ${data.atr.toFixed(4)}`;
-          statusEl.style.color = 'var(--green)';
+          const statusColor = data.as_of_date ? 'var(--gold)' : 'var(--green)';
+          statusEl.innerHTML = `✓ Price: ${data.price.toFixed(4)}  ATR: ${data.atr.toFixed(4)}${asOf}`;
+          statusEl.style.color = statusColor;
         }
         updateLotsUsd(data.price);
       } else {

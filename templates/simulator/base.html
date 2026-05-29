@@ -848,6 +848,7 @@ var _fetchMode = 'live';
 
 function setFetchMode(mode) {
   _fetchMode = mode;
+  localStorage.setItem('fetchMode', mode);
   const liveBtn   = document.getElementById('fetchModeLive');
   const periodBtn = document.getElementById('fetchModePeriod');
   const fetchBtn  = document.getElementById('fetchBtn');
@@ -926,6 +927,13 @@ function fetchPriceAtr() {
       statusEl.style.color = 'var(--neg)';
     });
 }
+
+(function() {
+  var stored = localStorage.getItem('fetchMode');
+  if (stored === 'period' && document.getElementById('fetchModeWrap')) {
+    setFetchMode('period');
+  }
+})();
 
 function autoFetchSymbol(sel) {
   updateAssetLabels(sel.value);

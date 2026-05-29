@@ -660,7 +660,12 @@ def bt_result_view(job_id):
         lots_fmt = f'{lots:.{_lot_dec}f}'
         return lots_fmt, margin
 
-    top_cycles = sorted(result.cycles, key=lambda c: c.whipsaws, reverse=True)[:5]
+    # Sort by (whipsaws DESC, margin DESC) — among ties use the higher-margin cycle
+    top_cycles = sorted(
+        result.cycles,
+        key=lambda c: (c.whipsaws, _ws_peak_info(c)[1]),
+        reverse=True,
+    )[:5]
     top6_ws = [(c.whipsaws, *_ws_peak_info(c)) for c in top_cycles]
     # top6_ws[i] = (ws_count, lots_str, peak_margin)
     ws_breakdown = _build_ws_breakdown(result)

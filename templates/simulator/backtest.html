@@ -296,7 +296,7 @@
     <div class="stat-lbl">Max Whipsaws</div>
     <div class="stat-val mono">{{ top6[0][0] if top6 else 0 }}</div>
     {% if top6 %}
-    <div class="stat-foot muted-foot">{{ top6[0][1] }} lots · m ${{ top6[0][2] | capfmt }}</div>
+    <div class="stat-foot muted-foot">{{ top6[0][1] }} lots · m ${{ '{:,.2f}'.format(top6[0][2]) }}</div>
     {% else %}
     <div class="stat-note">—</div>
     {% endif %}

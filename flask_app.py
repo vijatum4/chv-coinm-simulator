@@ -925,16 +925,17 @@ def api_symbols():
 
 @app.route('/sim/api/price-atr')
 def api_price_atr():
-    sym      = request.args.get('symbol', 'SOLUSDT')
-    atr_tf   = request.args.get('atr_tf', '4h')
-    period   = int(request.args.get('atr_period', 5))
-    period_2 = int(request.args.get('atr_period_2', 0))
-    bt_days  = int(request.args.get('bt_days', 0))
+    sym           = request.args.get('symbol', 'SOLUSDT')
+    atr_tf        = request.args.get('atr_tf', '4h')
+    period        = int(request.args.get('atr_period', 5))
+    period_2      = int(request.args.get('atr_period_2', 0))
+    bt_days       = int(request.args.get('bt_days', 0))
+    dual_atr_mode = request.args.get('dual_atr_mode', 'min')
+    pick          = min if dual_atr_mode == 'min' else max
     try:
         if bt_days > 0:
             import time as _time
             raw_ts   = int(_time.time() * 1000) - bt_days * 86_400_000
-            # Snap to midnight UTC so as_of_date is deterministic
             midnight = (raw_ts // 86_400_000) * 86_400_000
             price, atr1, err, atr2 = fetch_price_and_atr_as_of(
                 sym, atr_tf, period, as_of_ts=midnight, atr_period_2=period_2)
@@ -943,9 +944,8 @@ def api_price_atr():
             as_of_date = datetime.datetime.utcfromtimestamp(
                 midnight / 1000).strftime('%Y-%m-%d')
             if period_2 > 0 and atr2:
-                atr_used = min(atr1, atr2)
                 return jsonify({'ok': True, 'price': price,
-                                'atr': round(atr_used, 6),
+                                'atr': round(pick(atr1, atr2), 6),
                                 'atr1': atr1, 'atr2': atr2,
                                 'as_of_date': as_of_date})
             return jsonify({'ok': True, 'price': price, 'atr': atr1,
@@ -956,7 +956,7 @@ def api_price_atr():
             return jsonify({'ok': False, 'error': err})
         if period_2 > 0:
             _, atr2, _ = fetch_price_and_atr(sym, atr_tf, period_2)
-            atr_used = min(atr1, atr2) if atr2 else atr1
+            atr_used = pick(atr1, atr2) if atr2 else atr1
             return jsonify({'ok': True, 'price': price,
                             'atr': round(atr_used, 6),
                             'atr1': atr1, 'atr2': atr2})

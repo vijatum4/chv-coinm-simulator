@@ -679,7 +679,7 @@ input[type=range].sf-range::-moz-range-track{
         </div>
         <input type="hidden" name="dual_atr_mode" id="dualAtrModeInput" value="{{ dual_atr_mode }}">
         <div id="dualAtrSection" {% if not dual_atr_on %}style="display:none"{% endif %}>
-          <div class="sf-slider-row" style="margin-top:2px">
+          <div class="sf-slider-row" style="margin-top:10px">
             <div class="sf-slider-head">
               <label class="sf-slider-lbl" for="atrPeriod2Range">ATR Period 2</label>
               <span class="sf-slider-badge" id="atrPeriod2Badge">{{ atr_period_2 }}</span>
@@ -923,7 +923,10 @@ function fetchPriceAtr() {
   statusEl.textContent = isPeriod ? 'Fetching period start…' : 'Fetching…';
   statusEl.style.color = 'var(--gold)';
   let url = `/sim/api/price-atr?symbol=${sym}&atr_tf=${atrTf}&atr_period=${period}`;
-  if (period2) url += `&atr_period_2=${period2}`;
+  if (period2) {
+    const dualMode = document.getElementById('dualAtrModeInput')?.value || 'min';
+    url += `&atr_period_2=${period2}&dual_atr_mode=${dualMode}`;
+  }
   if (isPeriod) {
     const btDaysEl = document.querySelector('[name=bt_days]');
     const btDays = btDaysEl ? parseInt(btDaysEl.value) || 365 : 365;

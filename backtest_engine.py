@@ -329,11 +329,10 @@ def run_backtest(
         params = calculate_params(symbol, entry_price, atr_val, buffer, reward_ratio, atr_guard_multiplier)
 
         # Fixed-margin mode: recompute base_lots every cycle so margin stays constant.
-        # Lots = floor(target_margin × leverage / entry_price / step) × step.
-        # Uses the actual order entry price (LP for LONG, SP for SHORT).
+        # Both lot computation and $5 check use entry_price (candle close) for
+        # consistency — avoids LP/SP spread causing false rejections at step boundaries.
         if fixed_margin > 0 and lot_step > 0:
-            order_price = params.lp if start_direction == 'LONG' else params.sp
-            raw = fixed_margin * leverage / order_price / lot_step
+            raw = fixed_margin * leverage / entry_price / lot_step
             cycle_lots = round(math.floor(raw) * lot_step, 8)
             if cycle_lots <= 0:
                 i += 1
@@ -341,16 +340,14 @@ def run_backtest(
         else:
             cycle_lots = base_lots
 
-        # Binance $5 min notional check: WS1 inversion lot × inversion price must ≥ $5.
-        # WS1 lot = cycle_lots × 0.5; inversion price = SP (for LONG) or LP (for SHORT).
+        # Binance $5 min notional check: WS1 inversion lot × entry_price must ≥ $5.
         if min_notional_on:
             inv_lots  = round(cycle_lots * 0.5, 6)
-            inv_price = params.sp if start_direction == 'LONG' else params.lp
-            if inv_lots * inv_price < 5.0:
+            if inv_lots * entry_price < 5.0:
                 mn_rejected = True
                 mn_cycle    = cycle_num + 1
                 mn_price    = entry_price
-                mn_notional = round(inv_lots * inv_price, 4)
+                mn_notional = round(inv_lots * entry_price, 4)
                 break
 
         # ATR Guard: compare footprint to trading TF ATR (not macro ATR).

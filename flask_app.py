@@ -607,6 +607,7 @@ def bt_result_view(job_id):
     growth_pct = (result.total_net_pnl / bt_cap * 100) if bt_cap else 0
     _leverage   = float(d.get('leverage', 10))
     _base_lots  = float(d.get('base_lots', 1.0))
+    _lot_dec    = LOT_SPECS.get(d.get('symbol', ''), (0.001, 0.001, 3))[2]
 
     # ── Liquidation detail ─────────────────────────────────────────────────
     liq_detail = None
@@ -652,13 +653,16 @@ def bt_result_view(job_id):
                 'reason':        reason,
             }
 
-    def _ws_peak_margin(cycle):
+    def _ws_peak_info(cycle):
         N = cycle.whipsaws
         lots = _base_lots if N == 0 else _base_lots * 0.5 * (1.5 ** max(N - 1, 0))
-        return lots * float(cycle.entry_price) / _leverage
+        margin = lots * float(cycle.entry_price) / _leverage
+        lots_fmt = f'{lots:.{_lot_dec}f}'
+        return lots_fmt, margin
 
     top_cycles = sorted(result.cycles, key=lambda c: c.whipsaws, reverse=True)[:5]
-    top6_ws = [(c.whipsaws, _ws_peak_margin(c)) for c in top_cycles]
+    top6_ws = [(c.whipsaws, *_ws_peak_info(c)) for c in top_cycles]
+    # top6_ws[i] = (ws_count, lots_str, peak_margin)
     ws_breakdown = _build_ws_breakdown(result)
 
     # capital at worst_intra_loss_cycle

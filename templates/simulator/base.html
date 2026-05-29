@@ -550,10 +550,11 @@ input[type=range].sf-range::-moz-range-track{
 .nav-wrap.open{max-height:340px;opacity:1}
 .nav-wrap.closed{max-height:0;opacity:0}
 .nav-toggle-chevron{
-  width:13px;height:13px;stroke:currentColor;stroke-width:2.5;fill:none;
+  width:18px;height:18px;stroke:currentColor;stroke-width:2.5;fill:none;
   stroke-linecap:round;stroke-linejoin:round;
   transition:transform 0.3s ease;margin:0 8px;flex-shrink:0;
 }
+#navToggleBtn{transition:padding 0.35s ease}
 #navToggleBtn.nav-open .nav-toggle-chevron{transform:rotate(180deg)}
 
 {% block extra_css %}{% endblock %}
@@ -578,7 +579,7 @@ input[type=range].sf-range::-moz-range-track{
         <div style="flex:1;height:1px;background:var(--line)"></div>
       </button>
       <div class="nav-wrap" id="navWrap">
-        <nav class="nav">
+        <nav class="nav" style="padding-bottom:4px">
           <a href="/sim/guide" class="{% if mode=='guide' %}active{% endif %}">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
             Guide
@@ -609,7 +610,7 @@ input[type=range].sf-range::-moz-range-track{
           </a>
         </nav>
       </div>
-      <div class="sb-divider"></div>
+      <div class="sb-divider" id="navDivider"></div>
     </div>
 
     <!-- Sidebar form — shared params -->
@@ -879,12 +880,17 @@ function autoFetchSymbol(sel) {
 
 // Collapsible nav
 function setNav(open) {
-  var wrap = document.getElementById('navWrap');
-  var btn  = document.getElementById('navToggleBtn');
+  var wrap    = document.getElementById('navWrap');
+  var btn     = document.getElementById('navToggleBtn');
+  var divider = document.getElementById('navDivider');
   if (!wrap) return;
   wrap.classList.toggle('open', open);
   wrap.classList.toggle('closed', !open);
-  if (btn) btn.classList.toggle('nav-open', open);
+  if (btn) {
+    btn.classList.toggle('nav-open', open);
+    btn.style.padding = open ? '10px 2px 8px' : '4px 2px';
+  }
+  if (divider) divider.style.display = open ? '' : 'none';
   localStorage.setItem('navOpen', open ? 'true' : 'false');
 }
 function toggleNav() {

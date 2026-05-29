@@ -148,7 +148,9 @@ def _parse_sidebar(form, sess):
         d['capital'] = 1000.0
 
     for key in ('ws_limit_on', 'atr_guard_on', 'use_live', 'dual_atr_on'):
-        val = src.get(key, '')
+        # When a form is submitted, absent checkbox = explicitly unchecked.
+        # Only fall back to session on GET (form is empty {}).
+        val = form.get(key, '') if form else src.get(key, '')
         d[key] = bool(val and val not in ('', 'off', 'false', '0', False))
 
     sl = src.get('slippage_label', d['slippage_label'])

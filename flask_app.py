@@ -109,6 +109,8 @@ def _sidebar_defaults():
         atr_guard_multiplier=1.0, # matches Streamlit default
         use_live=True,
         base_asset='SOL',
+        dual_atr_on=False,
+        atr_period_2=14,
     )
 
 
@@ -128,7 +130,7 @@ def _parse_sidebar(form, sess):
     if form.get('trading_tf'):
         d['atr_tf'] = TF_RULE.get(form['trading_tf'], '4h')
 
-    for key in ('atr_period', 'leverage', 'ws_limit'):
+    for key in ('atr_period', 'atr_period_2', 'leverage', 'ws_limit'):
         try:
             d[key] = int(src[key])
         except (KeyError, TypeError, ValueError):
@@ -145,7 +147,7 @@ def _parse_sidebar(form, sess):
     if 'capital' not in form and 'capital' not in sess:
         d['capital'] = 1000.0
 
-    for key in ('ws_limit_on', 'atr_guard_on', 'use_live'):
+    for key in ('ws_limit_on', 'atr_guard_on', 'use_live', 'dual_atr_on'):
         val = src.get(key, '')
         d[key] = bool(val and val not in ('', 'off', 'false', '0', False))
 
@@ -453,6 +455,7 @@ def _bt_worker(job_id: str):
             trading_candles=trading_candles,
             atr_candles=atr_candles,
             atr_period=int(d['atr_period']),
+            atr_period_2=int(d['atr_period_2']) if d.get('dual_atr_on') else 0,
             base_lots=d['base_lots'],
             leverage=int(d['leverage']),
             capital=d['capital'],
@@ -881,14 +884,21 @@ def api_symbols():
 
 @app.route('/sim/api/price-atr')
 def api_price_atr():
-    sym = request.args.get('symbol', 'SOLUSDT')
-    atr_tf = request.args.get('atr_tf', '4h')
-    period = int(request.args.get('atr_period', 5))
+    sym      = request.args.get('symbol', 'SOLUSDT')
+    atr_tf   = request.args.get('atr_tf', '4h')
+    period   = int(request.args.get('atr_period', 5))
+    period_2 = int(request.args.get('atr_period_2', 0))
     try:
-        price, atr, err = fetch_price_and_atr(sym, atr_tf, period)
+        price, atr1, err = fetch_price_and_atr(sym, atr_tf, period)
         if err:
             return jsonify({'ok': False, 'error': err})
-        return jsonify({'ok': True, 'price': price, 'atr': atr})
+        if period_2 > 0:
+            _, atr2, _ = fetch_price_and_atr(sym, atr_tf, period_2)
+            atr_used = min(atr1, atr2) if atr2 else atr1
+            return jsonify({'ok': True, 'price': price,
+                            'atr': round(atr_used, 6),
+                            'atr1': atr1, 'atr2': atr2})
+        return jsonify({'ok': True, 'price': price, 'atr': atr1})
     except Exception as ex:
         return jsonify({'ok': False, 'error': str(ex)})
 

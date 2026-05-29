@@ -158,7 +158,10 @@
       <div class="param"><div class="lbl">Symbol</div><div class="val" style="font-size:13px">{{ symbol }}</div></div>
       <div class="param"><div class="lbl">Trading TF</div><div class="val">{{ trading_tf }}</div></div>
       <div class="param"><div class="lbl">ATR TF</div><div class="val">{{ atr_tf }}</div></div>
-      <div class="param"><div class="lbl">ATR Period</div><div class="val">{{ atr_period }}</div></div>
+      <div class="param">
+        <div class="lbl">ATR Period{% if dual_atr_on %} · Dual{% endif %}</div>
+        <div class="val">{{ atr_period }}{% if dual_atr_on %}<span style="opacity:0.55">/</span>{{ atr_period_2 }}{% endif %}</div>
+      </div>
       <div class="param"><div class="lbl">Buffer</div><div class="val">{{ efficiency_buffer }}</div></div>
       <div class="param"><div class="lbl">Reward Ratio</div><div class="val">{{ reward_ratio }}</div></div>
       <div class="param"><div class="lbl">Base Lots</div><div class="val">{{ base_lots }}</div></div>

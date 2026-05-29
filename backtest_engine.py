@@ -262,6 +262,7 @@ def run_backtest(
     trading_candles: List[Candle],
     atr_candles: List[Candle],
     atr_period: int = 14,
+    atr_period_2: int = 0,        # 0 = disabled; if set, use min(ATR1, ATR2) each cycle
     base_lots: float = 1.0,
     leverage: float = 10.0,
     capital: float = 1000.0,
@@ -304,6 +305,11 @@ def run_backtest(
         if atr_val <= 0:
             i += 1
             continue
+        # Dual ATR: if a second period is configured, take the lower value
+        if atr_period_2 > 0 and len(aligned) >= atr_period_2 + 1:
+            atr_val_2 = calc_atr(aligned, atr_period_2)
+            if atr_val_2 > 0:
+                atr_val = min(atr_val, atr_val_2)
 
         entry_price = trading_candles[i].close
         params = calculate_params(symbol, entry_price, atr_val, buffer, reward_ratio, atr_guard_multiplier)

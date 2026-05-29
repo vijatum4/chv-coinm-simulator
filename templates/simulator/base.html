@@ -662,7 +662,7 @@ input[type=range].sf-range::-moz-range-track{
                    onchange="toggleDualAtr(this)">
             <span class="sf-toggle-lbl">Dual ATR Period</span>
           </label>
-          <div id="dualAtrModePills" style="display:flex;gap:4px;{% if not dual_atr_on %}opacity:0.25;pointer-events:none{% endif %}">
+          <div id="dualAtrModePills" style="display:{% if dual_atr_on %}flex{% else %}none{% endif %};gap:4px">
             <button type="button" id="dualAtrModeMin" onclick="setDualAtrMode('min')"
                     style="padding:2px 9px;font-size:10px;font-weight:700;border:none;border-radius:20px;cursor:pointer;letter-spacing:0.04em;
                            background:{% if dual_atr_mode != 'max' %}var(--green){% else %}rgba(255,255,255,0.07){% endif %};
@@ -691,7 +691,7 @@ input[type=range].sf-range::-moz-range-track{
         </div>
 
         {% if mode == 'backtest' %}
-        <div id="fetchModeWrap" style="display:flex;gap:0;margin-bottom:6px;border:1px solid var(--border);border-radius:7px;overflow:hidden">
+        <div id="fetchModeWrap" style="display:flex;gap:0;margin-top:10px;margin-bottom:6px;border:1px solid var(--border);border-radius:7px;overflow:hidden">
           <button type="button" id="fetchModeLive" onclick="setFetchMode('live')"
                   style="flex:1;padding:5px 0;font-size:11px;font-weight:600;border:none;cursor:pointer;
                          background:var(--green);color:#000;transition:background 0.15s,color 0.15s">
@@ -985,8 +985,7 @@ function toggleDualAtr(checkbox) {
   toggleSection('dualAtrSection', checkbox);
   var pills = document.getElementById('dualAtrModePills');
   if (pills) {
-    pills.style.opacity = checkbox.checked ? '1' : '0.25';
-    pills.style.pointerEvents = checkbox.checked ? '' : 'none';
+    pills.style.display = checkbox.checked ? 'flex' : 'none';
   }
 }
 

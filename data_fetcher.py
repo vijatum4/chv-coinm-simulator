@@ -176,12 +176,16 @@ def fetch_price_and_atr_as_of(
     if klines is None:
         return None, None, f"Could not fetch historical candles for {symbol}", None
 
-    # Price = close of the last candle fetched (end of the ATR window)
-    price = float(klines[-1][4])
+    # Price = close of the FIRST candle (midnight open → first close).
+    # Using klines[0] ensures price is identical regardless of how many
+    # candles were fetched (which varies by ATR period / dual mode).
+    price = float(klines[0][4])
 
     def _calc_atr(candles, period):
+        # Use the FIRST `period` TRs so ATR[5] always covers the same
+        # candles (hours 0–5) whether fetched alone or in dual mode.
         trs = []
-        for i in range(1, len(candles)):
+        for i in range(1, min(period + 1, len(candles))):
             high       = float(candles[i][2])
             low        = float(candles[i][3])
             prev_close = float(candles[i - 1][4])
@@ -189,7 +193,7 @@ def fetch_price_and_atr_as_of(
             trs.append(tr)
         if len(trs) < period:
             return None
-        return round(statistics.mean(trs[-period:]), 6)
+        return round(statistics.mean(trs), 6)
 
     atr1 = _calc_atr(klines, atr_period)
     if atr1 is None:

@@ -113,6 +113,8 @@ def _sidebar_defaults():
         dual_atr_on=False,
         atr_period_2=14,
         min_notional_on=False,
+        fixed_margin_on=False,
+        target_margin=50.0,
     )
 
 
@@ -139,7 +141,7 @@ def _parse_sidebar(form, sess):
             pass
 
     for key in ('price_val', 'atr_val', 'efficiency_buffer', 'reward_ratio',
-                'base_lots', 'capital', 'fee_rate_pct', 'atr_guard_multiplier'):
+                'base_lots', 'capital', 'fee_rate_pct', 'atr_guard_multiplier', 'target_margin'):
         try:
             d[key] = float(src[key])
         except (KeyError, TypeError, ValueError):
@@ -149,7 +151,7 @@ def _parse_sidebar(form, sess):
     if 'capital' not in form and 'capital' not in sess:
         d['capital'] = 1000.0
 
-    for key in ('ws_limit_on', 'atr_guard_on', 'use_live', 'dual_atr_on', 'min_notional_on'):
+    for key in ('ws_limit_on', 'atr_guard_on', 'use_live', 'dual_atr_on', 'min_notional_on', 'fixed_margin_on'):
         # When a form is submitted, absent checkbox = explicitly unchecked.
         # Only fall back to session on GET (form is empty {}).
         val = form.get(key, '') if form else src.get(key, '')
@@ -309,7 +311,7 @@ _EXIT_DISPLAY = {
 }
 
 def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$',
-                 reward_ratio: float = 2.5) -> list:
+                 reward_ratio: float = 2.5, lot_dec: int = 3) -> list:
     cap = capital
     rows = []
     for c in result.cycles:
@@ -336,6 +338,7 @@ def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$',
             'pnl_fmt': (f'+{cur_sym}{c.net_pnl:,.2f}' if c.net_pnl >= 0 else f'-{cur_sym}{abs(c.net_pnl):,.2f}'),
             'pnl_pos': c.net_pnl > 0,
             'pnl_zero': c.net_pnl == 0,
+            'lots': f'{c.base_lots:.{lot_dec}f}',
             'entry': f'{c.entry_price:.4f}',
             'tp': tp_fmt,
             'atr': f'{c.atr_at_entry:.4f}',
@@ -471,6 +474,8 @@ def _bt_worker(job_id: str):
             atr_guard=d.get('atr_guard_on', True),
             atr_guard_multiplier=d.get('atr_guard_multiplier', 1.0),
             min_notional_on=bool(d.get('min_notional_on', False)),
+            fixed_margin=float(d['target_margin']) if d.get('fixed_margin_on') else 0.0,
+            lot_step=LOT_SPECS.get(d.get('symbol', ''), (0.001, 0.001, 3))[1],
         )
         upd(92, 'Saving CSV…')
         _save_bt_csv(result, d)
@@ -675,7 +680,8 @@ def bt_result_view(job_id):
 
     def _ws_peak_info(cycle):
         N = cycle.whipsaws
-        lots = _base_lots if N == 0 else _base_lots * 0.5 * (1.5 ** max(N - 1, 0))
+        cb = cycle.base_lots   # actual lots for this cycle (varies in fixed-margin mode)
+        lots = cb if N == 0 else cb * 0.5 * (1.5 ** max(N - 1, 0))
         margin = lots * float(cycle.entry_price) / _leverage
         lots_fmt = f'{lots:.{_lot_dec}f}'
         return lots_fmt, margin
@@ -701,7 +707,8 @@ def bt_result_view(job_id):
     cur_sym = '$'
 
     log = _prep_bt_log(result, bt_cap, d_job.get('trading_tf', '1h'), cur_sym,
-                       reward_ratio=float(d_job.get('reward_ratio', 2.5)))
+                       reward_ratio=float(d_job.get('reward_ratio', 2.5)),
+                       lot_dec=_lot_dec)
     charts = _build_bt_charts(result, bt_cap, cur_sym)
 
     return render_template('simulator/backtest.html',

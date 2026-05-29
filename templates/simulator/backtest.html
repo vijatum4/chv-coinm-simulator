@@ -590,6 +590,7 @@
           <th>Capital After</th>
           <th>P&amp;L</th>
           <th>Position</th>
+          <th>Lots</th>
           <th>Entry</th>
           <th>TP</th>
           <th>ATR {{ atr_period }}{% if dual_atr_on %}/{{ atr_period_2 }}{% endif %}</th>
@@ -613,6 +614,7 @@
               {{ row.exit_display }}
             </span>
           </td>
+          <td style="color:var(--beige-dim)">{{ row.lots }}</td>
           <td>{{ row.entry }}</td>
           <td style="color:var(--beige-dim)">{{ row.tp }}</td>
           <td>{{ row.atr }}</td>
@@ -625,7 +627,7 @@
           <td style="color:var(--beige-dim)">{{ row.end }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="14" class="empty-state" style="padding:40px;text-align:center;color:var(--muted)">No cycles yet</td></tr>
+        <tr><td colspan="15" class="empty-state" style="padding:40px;text-align:center;color:var(--muted)">No cycles yet</td></tr>
         {% endfor %}
       </tbody>
     </table>

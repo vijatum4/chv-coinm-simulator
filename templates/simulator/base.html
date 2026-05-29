@@ -743,12 +743,27 @@ input[type=range].sf-range::-moz-range-track{
                  oninput="updateLotsUsd()">
         </div>
         <div id="lotsUsdNote" style="display:none;font-size:10.5px;color:var(--muted);margin-top:-2px;margin-bottom:4px;line-height:1.4"></div>
-        <label class="sf-toggle" style="margin-bottom:10px">
+        <label class="sf-toggle" style="margin-bottom:6px">
           <input type="checkbox" name="min_notional_on" id="minNotionalCheck"
                  {% if min_notional_on %}checked{% endif %}
                  onchange="updateLotsUsd()">
           <span class="sf-toggle-lbl">Binance $5 Min Notional</span>
         </label>
+        <label class="sf-toggle" style="margin-bottom:10px">
+          <input type="checkbox" name="fixed_margin_on" id="fixedMarginCheck"
+                 {% if fixed_margin_on %}checked{% endif %}
+                 onchange="toggleFixedMargin(this)">
+          <span class="sf-toggle-lbl">Fixed Margin per Cycle</span>
+        </label>
+        <div id="fixedMarginSection" {% if not fixed_margin_on %}style="display:none"{% endif %}>
+          <div class="sf-row" style="margin-bottom:2px">
+            <label class="sf-field-label">Target Margin (USD)</label>
+            <input class="sf-input mono" type="number" name="target_margin" id="targetMarginInput"
+                   value="{{ target_margin }}" step="1" min="1"
+                   oninput="updateFixedMarginPreview()">
+          </div>
+          <div class="sf-caption" style="margin-bottom:10px">Lots = target × leverage ÷ price · rounded down to lot step</div>
+        </div>
 
         <div class="sf-slider-row">
           <div class="sf-slider-head">
@@ -757,7 +772,7 @@ input[type=range].sf-range::-moz-range-track{
           </div>
           <input class="sf-range" type="range" id="leverageRange" name="leverage"
                  min="1" max="125" step="1" value="{{ leverage }}"
-                 oninput="document.getElementById('leverageBadge').textContent=this.value+'×'">
+                 oninput="document.getElementById('leverageBadge').textContent=this.value+'×'; if(document.getElementById('fixedMarginCheck')?.checked) updateFixedMarginPreview()">
         </div>
 
         <div class="sf-row">
@@ -922,7 +937,11 @@ function fetchPriceAtr() {
           statusEl.innerHTML = `✓ Price: ${data.price.toFixed(4)}  ATR: ${data.atr.toFixed(4)}${asOf}`;
           statusEl.style.color = statusColor;
         }
-        updateLotsUsd(data.price);
+        if (document.getElementById('fixedMarginCheck')?.checked) {
+          updateFixedMarginPreview();
+        } else {
+          updateLotsUsd(data.price);
+        }
       } else {
         statusEl.textContent = '✗ ' + (data.error || 'Failed');
         statusEl.style.color = 'var(--neg)';
@@ -941,6 +960,47 @@ function fetchPriceAtr() {
   }
 })();
 
+
+function toggleFixedMargin(checkbox) {
+  const section = document.getElementById('fixedMarginSection');
+  const baseLotsInput = document.getElementById('baseLotsInput');
+  const baseLotsLabel = document.getElementById('baseLotsLabel');
+  if (section) section.style.display = checkbox.checked ? '' : 'none';
+  if (baseLotsInput) {
+    baseLotsInput.disabled  = checkbox.checked;
+    baseLotsInput.style.opacity = checkbox.checked ? '0.38' : '';
+    baseLotsInput.style.cursor  = checkbox.checked ? 'not-allowed' : '';
+  }
+  if (checkbox.checked) {
+    updateFixedMarginPreview();
+  } else {
+    if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots ({{ base_asset }})';
+    updateLotsUsd();
+  }
+}
+
+function updateFixedMarginPreview() {
+  const price = parseFloat(document.getElementById('priceInput')?.value);
+  const margin = parseFloat(document.getElementById('targetMarginInput')?.value);
+  const leverage = parseInt(document.getElementById('leverageRange')?.value || '10');
+  const step = {{ lot_step }};
+  const dec  = {{ lot_dec }};
+  const baseLotsInput = document.getElementById('baseLotsInput');
+  const baseLotsLabel = document.getElementById('baseLotsLabel');
+  if (!price || !margin || isNaN(price) || isNaN(margin) || step <= 0) return;
+  const stepsCount = Math.floor(margin * leverage / price / step);
+  const lots = parseFloat((stepsCount * step).toFixed(dec));
+  const actualMargin = (lots * price / leverage).toFixed(2);
+  if (baseLotsInput) baseLotsInput.value = lots.toFixed(dec);
+  if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots ({{ base_asset }}) · $' + actualMargin + ' margin';
+  updateLotsUsd(price);
+}
+
+// On page load, restore fixed-margin grayed state if toggle is already checked
+(function() {
+  var chk = document.getElementById('fixedMarginCheck');
+  if (chk && chk.checked) toggleFixedMargin(chk);
+})();
 
 function autoFetchSymbol(sel) {
   updateAssetLabels(sel.value);

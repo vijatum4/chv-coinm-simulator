@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict
+import math
 import statistics
 
 
@@ -278,6 +279,8 @@ def run_backtest(
     atr_guard: bool = True,
     atr_guard_multiplier: float = 1.0,
     min_notional_on: bool = False,  # enforce Binance $5 min notional on WS1 inversion
+    fixed_margin: float = 0.0,      # >0 = fixed USD margin per cycle; lots computed dynamically
+    lot_step: float = 0.001,        # symbol lot step for rounding in fixed-margin mode
 ) -> BacktestResult:
     from chv_engine import calculate_params
 
@@ -325,10 +328,23 @@ def run_backtest(
         entry_price = trading_candles[i].close
         params = calculate_params(symbol, entry_price, atr_val, buffer, reward_ratio, atr_guard_multiplier)
 
+        # Fixed-margin mode: recompute base_lots every cycle so margin stays constant.
+        # Lots = floor(target_margin × leverage / entry_price / step) × step.
+        # Uses the actual order entry price (LP for LONG, SP for SHORT).
+        if fixed_margin > 0 and lot_step > 0:
+            order_price = params.lp if start_direction == 'LONG' else params.sp
+            raw = fixed_margin * leverage / order_price / lot_step
+            cycle_lots = round(math.floor(raw) * lot_step, 8)
+            if cycle_lots <= 0:
+                i += 1
+                continue
+        else:
+            cycle_lots = base_lots
+
         # Binance $5 min notional check: WS1 inversion lot × inversion price must ≥ $5.
-        # WS1 lot = base_lots × 0.5; inversion price = SP (for LONG) or LP (for SHORT).
+        # WS1 lot = cycle_lots × 0.5; inversion price = SP (for LONG) or LP (for SHORT).
         if min_notional_on:
-            inv_lots  = round(base_lots * 0.5, 6)
+            inv_lots  = round(cycle_lots * 0.5, 6)
             inv_price = params.sp if start_direction == 'LONG' else params.lp
             if inv_lots * inv_price < 5.0:
                 mn_rejected = True
@@ -354,7 +370,7 @@ def run_backtest(
             trading_candles, i,
             params.lp, params.sp, params.tl, params.ts,
             params.c, params.d,
-            base_lots, leverage, running_capital, fee_rate, slippage_pct,
+            cycle_lots, leverage, running_capital, fee_rate, slippage_pct,
             start_direction=start_direction,
             max_whipsaws=max_whipsaws,
         )
@@ -399,7 +415,7 @@ def run_backtest(
             sp=params.sp,
             tl=params.tl,
             ts=params.ts,
-            base_lots=base_lots,
+            base_lots=cycle_lots,
             steps=steps,
             whipsaws=whipsaws,
             net_pnl=net_pnl,

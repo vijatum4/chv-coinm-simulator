@@ -545,6 +545,17 @@ input[type=range].sf-range::-moz-range-track{
   background:var(--olive-600);height:4px;border-radius:99px;
 }
 
+/* ── Nav collapse ───────────────────────────────────────── */
+.nav-wrap{overflow:hidden;transition:max-height 0.35s ease,opacity 0.25s ease}
+.nav-wrap.open{max-height:340px;opacity:1}
+.nav-wrap.closed{max-height:0;opacity:0}
+.nav-toggle-chevron{
+  width:13px;height:13px;stroke:currentColor;stroke-width:2.5;fill:none;
+  stroke-linecap:round;stroke-linejoin:round;
+  transition:transform 0.3s ease;margin:0 8px;flex-shrink:0;
+}
+#navToggleBtn.nav-open .nav-toggle-chevron{transform:rotate(180deg)}
+
 {% block extra_css %}{% endblock %}
 </style>
 </head>
@@ -559,38 +570,45 @@ input[type=range].sf-range::-moz-range-track{
     </div>
 
     <!-- Nav -->
-    <div style="padding:10px">
-      <div class="sb-divider" style="margin:10px 0 8px"></div>
-      <nav class="nav">
-        <a href="/sim/guide" class="{% if mode=='guide' %}active{% endif %}">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-          Guide
-        </a>
-        <a href="/sim/simulator" class="{% if mode=='simulator' %}active{% endif %}">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
-          Simulator
-        </a>
-        <a href="/sim/backtest" class="{% if mode=='backtest' %}active{% endif %}">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg>
-          Backtest
-        </a>
-        <a href="/sim/optimizer" class="{% if mode=='optimizer' %}active{% endif %}">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
-          Optimizer
-        </a>
-        <a href="/sim/botconfig" class="{% if mode=='botconfig' %}active{% endif %}">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-          Bot Config
-        </a>
-        <a href="/sim/history" class="{% if mode=='history' %}active{% endif %}">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
-          History
-        </a>
-        <a href="/sim/about" class="{% if mode=='about' %}active{% endif %}">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-          About
-        </a>
-      </nav>
+    <div style="padding:0 10px">
+      <button type="button" onclick="toggleNav()" id="navToggleBtn"
+        style="width:100%;background:none;border:0;cursor:pointer;padding:10px 2px 8px;display:flex;align-items:center;color:var(--muted)">
+        <div style="flex:1;height:1px;background:var(--line)"></div>
+        <svg class="nav-toggle-chevron" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        <div style="flex:1;height:1px;background:var(--line)"></div>
+      </button>
+      <div class="nav-wrap" id="navWrap">
+        <nav class="nav">
+          <a href="/sim/guide" class="{% if mode=='guide' %}active{% endif %}">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
+            Guide
+          </a>
+          <a href="/sim/simulator" class="{% if mode=='simulator' %}active{% endif %}">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z"/></svg>
+            Simulator
+          </a>
+          <a href="/sim/backtest" class="{% if mode=='backtest' %}active{% endif %}">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg>
+            Backtest
+          </a>
+          <a href="/sim/optimizer" class="{% if mode=='optimizer' %}active{% endif %}">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            Optimizer
+          </a>
+          <a href="/sim/botconfig" class="{% if mode=='botconfig' %}active{% endif %}">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+            Bot Config
+          </a>
+          <a href="/sim/history" class="{% if mode=='history' %}active{% endif %}">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+            History
+          </a>
+          <a href="/sim/about" class="{% if mode=='about' %}active{% endif %}">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            About
+          </a>
+        </nav>
+      </div>
       <div class="sb-divider"></div>
     </div>
 
@@ -858,6 +876,25 @@ function autoFetchSymbol(sel) {
   const priceEl = document.getElementById('priceInput');
   if (priceEl && priceEl.value) fetchPriceAtr();
 }
+
+// Collapsible nav
+function setNav(open) {
+  var wrap = document.getElementById('navWrap');
+  var btn  = document.getElementById('navToggleBtn');
+  if (!wrap) return;
+  wrap.classList.toggle('open', open);
+  wrap.classList.toggle('closed', !open);
+  if (btn) btn.classList.toggle('nav-open', open);
+  localStorage.setItem('navOpen', open ? 'true' : 'false');
+}
+function toggleNav() {
+  var wrap = document.getElementById('navWrap');
+  if (wrap) setNav(!wrap.classList.contains('open'));
+}
+(function() {
+  var stored = localStorage.getItem('navOpen');
+  setNav(stored !== 'false');  // default open
+})();
 
 // Collapsible params in hero
 function setParams(open) {

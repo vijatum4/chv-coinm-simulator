@@ -161,7 +161,7 @@
       <div class="param"><div class="lbl">ATR TF</div><div class="val">{{ atr_tf }}</div></div>
       <div class="param">
         <div class="lbl">ATR Period</div>
-        <div class="val">{{ atr_period }}{% if dual_atr_on %}<span style="opacity:0.45">/</span>{{ atr_period_2 }}<span style="opacity:0.55;font-size:10px"> {{ dual_atr_mode }}</span>{% endif %}</div>
+        <div class="val">{{ atr_period }}{% if dual_atr_on %}<span style="opacity:0.45">/</span>{{ atr_period_2 }}{% endif %}</div>
       </div>
       <div class="param"><div class="lbl">Buffer</div><div class="val">{{ efficiency_buffer }}</div></div>
       <div class="param"><div class="lbl">Reward Ratio</div><div class="val">{{ reward_ratio }}</div></div>
@@ -194,6 +194,10 @@
       <div class="param dim">
         <div class="lbl">Dual ATR</div>
         <div class="val">{{ 'On' if dual_atr_on else 'Off' }}</div>
+      </div>
+      <div class="param dim">
+        <div class="lbl">ATR Mode</div>
+        <div class="val">{% if dual_atr_on %}{{ dual_atr_mode | capitalize }}{% else %}—{% endif %}</div>
       </div>
     </div>
   </div>

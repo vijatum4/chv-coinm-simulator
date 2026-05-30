@@ -155,18 +155,46 @@
   </div>
   <div class="params-wrap" id="paramsWrap">
     <div class="params">
-      <div class="param"><div class="lbl">Symbol</div><div class="val" style="font-size:13px">{{ symbol }}</div></div>
+      {# ── Row 1: core setup ── #}
+      <div class="param"><div class="lbl">Symbol</div><div class="val" style="font-size:12px">{{ symbol }}</div></div>
       <div class="param"><div class="lbl">Trading TF</div><div class="val">{{ trading_tf }}</div></div>
       <div class="param"><div class="lbl">ATR TF</div><div class="val">{{ atr_tf }}</div></div>
       <div class="param">
         <div class="lbl">ATR Period</div>
-        <div class="val">{{ atr_period }}{% if dual_atr_on %}<span style="opacity:0.55">/</span>{{ atr_period_2 }}{% endif %}</div>
+        <div class="val">{{ atr_period }}{% if dual_atr_on %}<span style="opacity:0.45">/</span>{{ atr_period_2 }}<span style="opacity:0.55;font-size:10px"> {{ dual_atr_mode }}</span>{% endif %}</div>
       </div>
       <div class="param"><div class="lbl">Buffer</div><div class="val">{{ efficiency_buffer }}</div></div>
       <div class="param"><div class="lbl">Reward Ratio</div><div class="val">{{ reward_ratio }}</div></div>
-      <div class="param"><div class="lbl">Base Lots</div><div class="val">{{ base_lots }}</div></div>
+      <div class="param">
+        <div class="lbl">{% if fixed_margin_on %}Margin/Cycle{% else %}Base Lots{% endif %}</div>
+        <div class="val">{% if fixed_margin_on %}${{ '{:,.0f}'.format(target_margin) }}{% else %}{{ base_lots }}{% endif %}</div>
+      </div>
       <div class="param"><div class="lbl">Leverage</div><div class="val">{{ leverage }}×</div></div>
       <div class="param capital"><div class="lbl">Capital</div><div class="val">{{ '{:,.0f}'.format(bt_capital) }}</div></div>
+      {# ── Row 2: execution + guards ── #}
+      <div class="param dim"><div class="lbl">Fee</div><div class="val">{{ fee_rate_pct }}%</div></div>
+      <div class="param dim"><div class="lbl">Slippage</div><div class="val">{{ '%.2f'%(slip_pct*100) }}%</div></div>
+      <div class="param dim"><div class="lbl">Lookback</div><div class="val">{{ bt_days }}d</div></div>
+      <div class="param dim">
+        <div class="lbl">ATR Guard</div>
+        <div class="val">{% if atr_guard_on %}×{{ atr_guard_multiplier }}{% else %}Off{% endif %}</div>
+      </div>
+      <div class="param dim">
+        <div class="lbl">Max WS</div>
+        <div class="val">{% if ws_limit_on %}≤{{ ws_limit }}{% else %}Off{% endif %}</div>
+      </div>
+      <div class="param dim">
+        <div class="lbl">$5 Notional</div>
+        <div class="val">{{ 'On' if min_notional_on else 'Off' }}</div>
+      </div>
+      <div class="param dim">
+        <div class="lbl">Fixed Margin</div>
+        <div class="val">{{ 'On' if fixed_margin_on else 'Off' }}</div>
+      </div>
+      <div class="param dim">
+        <div class="lbl">Dual ATR</div>
+        <div class="val">{{ 'On' if dual_atr_on else 'Off' }}</div>
+      </div>
     </div>
   </div>
 </section>

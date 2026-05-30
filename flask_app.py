@@ -611,7 +611,7 @@ def bt_result_view(job_id):
 
     d = _parse_sidebar({}, session)
     d.update({k: v for k, v in d_job.items()
-              if k not in ('slip_pct', 'base_asset', 'settle_coin', 'lot_min', 'lot_step', 'lot_dec')})
+              if k not in ('base_asset', 'settle_coin', 'lot_min', 'lot_step', 'lot_dec')})
 
     total_trades = sum(len(c.steps) for c in result.cycles)
     growth_pct = (result.total_net_pnl / bt_cap * 100) if bt_cap else 0

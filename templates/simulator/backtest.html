@@ -167,7 +167,7 @@
       <div class="param"><div class="lbl">Reward Ratio</div><div class="val">{{ reward_ratio }}</div></div>
       <div class="param">
         <div class="lbl">{% if fixed_margin_on %}Margin/Cycle{% else %}Base Lots{% endif %}</div>
-        <div class="val">{% if fixed_margin_on %}${{ '{:,.0f}'.format(target_margin) }}{% else %}{{ base_lots }}{% endif %}</div>
+        <div class="val">{% if fixed_margin_on %}${{ '{:,.0f}'.format(target_margin) }}<span style="font-size:10px;opacity:0.55;margin-left:4px">{{ base_lots }}ʟ</span>{% else %}{{ base_lots }}{% endif %}</div>
       </div>
       <div class="param"><div class="lbl">Leverage</div><div class="val">{{ leverage }}×</div></div>
       <div class="param capital"><div class="lbl">Capital</div><div class="val">{{ '{:,.0f}'.format(bt_capital) }}</div></div>

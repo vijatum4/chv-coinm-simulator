@@ -884,7 +884,19 @@ input[type=range].sf-range::-moz-range-track{
 
 <script>
 // TF auto-update mapping
-const TF_RULE = {{ tf_rule | tojson }};
+const TF_RULE   = {{ tf_rule | tojson }};
+const _LOT_SPECS = {{ lot_specs | tojson }};
+
+function _lotStep() {
+  var sym = document.getElementById('symbolSelect')?.value
+         || document.querySelector('[name=symbol]')?.value || '';
+  return (_LOT_SPECS[sym] || [0.001, 0.001, 3])[1];
+}
+function _lotDec() {
+  var sym = document.getElementById('symbolSelect')?.value
+         || document.querySelector('[name=symbol]')?.value || '';
+  return (_LOT_SPECS[sym] || [0.001, 0.001, 3])[2];
+}
 
 function updateAssetLabels(symbolVal) {
   const base = (symbolVal || '').replace('USDT','').replace('BUSD','').replace('USD_PERP','');
@@ -1076,8 +1088,8 @@ function updateFixedMarginPreview() {
   const price    = parseFloat(document.getElementById('priceInput')?.value);
   const margin   = parseFloat(document.getElementById('targetMarginInput')?.value);
   const leverage = parseInt(document.getElementById('leverageRange')?.value || '10');
-  const step = {{ lot_step }};
-  const dec  = {{ lot_dec }};
+  const step = _lotStep();
+  const dec  = _lotDec();
   const baseLotsInput = document.getElementById('baseLotsInput');
   const baseLotsLabel = document.getElementById('baseLotsLabel');
   const note = document.getElementById('lotsUsdNote');
@@ -1235,8 +1247,8 @@ function updateLotsUsd(price) {
   var html = '≈ ' + fmt + ' notional';
   var min5On = document.getElementById('minNotionalCheck')?.checked;
   if (min5On) {
-    var step = {{ lot_step }};
-    var dec  = {{ lot_dec }};
+    var step = _lotStep();
+    var dec  = _lotDec();
     var invNotional = lots * 0.5 * price;
     if (invNotional < 5) {
       var minBase = Math.ceil((10 / price) / step) * step;

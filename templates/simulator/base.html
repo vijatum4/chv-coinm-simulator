@@ -887,9 +887,12 @@ input[type=range].sf-range::-moz-range-track{
 const TF_RULE = {{ tf_rule | tojson }};
 
 function updateAssetLabels(symbolVal) {
-  const base = (symbolVal || '').replace('USDT', '').replace('BUSD', '');
+  const base = (symbolVal || '').replace('USDT','').replace('BUSD','').replace('USD_PERP','');
   const lotsLbl = document.getElementById('baseLotsLabel');
-  if (lotsLbl) lotsLbl.textContent = `Base Lots (${base})`;
+  if (!lotsLbl) return;
+  const isFixed = document.getElementById('fixedMarginCheck')?.checked;
+  if (isFixed) updateFixedMarginPreview();
+  else lotsLbl.textContent = `Base Lots (${base})`;
 }
 
 function updateAtrTf(sel) {
@@ -1045,6 +1048,12 @@ function setDualAtrMode(mode) {
   }
 }
 
+function _currentBase() {
+  var sym = document.getElementById('symbolSelect')?.value
+         || document.querySelector('[name=symbol]')?.value || '';
+  return sym.replace('USDT','').replace('BUSD','').replace('USD_PERP','') || '{{ base_asset }}';
+}
+
 function toggleFixedMargin(checkbox) {
   const section = document.getElementById('fixedMarginSection');
   const baseLotsInput = document.getElementById('baseLotsInput');
@@ -1058,7 +1067,7 @@ function toggleFixedMargin(checkbox) {
   if (checkbox.checked) {
     updateFixedMarginPreview();
   } else {
-    if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots ({{ base_asset }})';
+    if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots (' + _currentBase() + ')';
     updateLotsUsd();
   }
 }
@@ -1076,7 +1085,7 @@ function updateFixedMarginPreview() {
   const lots = parseFloat((stepsCount * step).toFixed(dec));
   const actualMargin = (lots * price / leverage).toFixed(2);
   if (baseLotsInput) baseLotsInput.value = lots.toFixed(dec);
-  if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots ({{ base_asset }}) · $' + actualMargin + ' margin';
+  if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots (' + _currentBase() + ') · $' + actualMargin + ' margin';
   updateLotsUsd(price);
 }
 

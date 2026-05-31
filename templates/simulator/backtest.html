@@ -193,11 +193,11 @@
       </div>
       <div class="param dim">
         <div class="lbl">Dual ATR</div>
-        <div class="val">{{ 'On' if dual_atr_on else 'Off' }}</div>
+        <div class="val">{% if dual_atr_on %}On·{{ dual_atr_mode | capitalize }}{% else %}Off{% endif %}</div>
       </div>
       <div class="param dim">
-        <div class="lbl">Dual Mode</div>
-        <div class="val">{% if dual_atr_on %}{{ dual_atr_mode | capitalize }}{% else %}—{% endif %}</div>
+        <div class="lbl">SL Mode</div>
+        <div class="val">{{ sl_mode | capitalize }}</div>
       </div>
     </div>
   </div>

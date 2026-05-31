@@ -116,6 +116,7 @@ def _sidebar_defaults():
         min_notional_on=False,
         fixed_margin_on=False,
         target_margin=50.0,
+        sl_mode='wick',
     )
 
 
@@ -127,7 +128,7 @@ def _parse_sidebar(form, sess):
     d['symbol'] = sym
     d['base_asset'] = sym.replace('USDT', '').replace('BUSD', '')
 
-    for key in ('trading_tf', 'atr_tf', 'dual_atr_mode'):
+    for key in ('trading_tf', 'atr_tf', 'dual_atr_mode', 'sl_mode'):
         if src.get(key):
             d[key] = src[key]
 
@@ -478,6 +479,7 @@ def _bt_worker(job_id: str):
             min_notional_on=bool(d.get('min_notional_on', False)),
             fixed_margin=float(d['target_margin']) if d.get('fixed_margin_on') else 0.0,
             lot_step=LOT_SPECS.get(d.get('symbol', ''), (0.001, 0.001, 3))[1],
+            sl_mode=d.get('sl_mode', 'wick'),
         )
         upd(92, 'Saving CSV…')
         _save_bt_csv(result, d)

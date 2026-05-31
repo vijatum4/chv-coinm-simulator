@@ -819,6 +819,25 @@ input[type=range].sf-range::-moz-range-track{
       <div class="sb-section">
         <span class="sb-label">Guards</span>
 
+        <div style="display:flex;align-items:center;margin-bottom:16px">
+          <span class="sf-toggle-lbl" style="flex:1">SL Trigger</span>
+          <div style="display:flex;gap:4px">
+            <button type="button" id="slModeWick" onclick="setSlMode('wick')"
+                    style="padding:2px 9px;font-size:10px;font-weight:700;border:none;border-radius:20px;cursor:pointer;letter-spacing:0.04em;
+                           background:{% if sl_mode != 'close' %}var(--green){% else %}rgba(255,255,255,0.07){% endif %};
+                           color:{% if sl_mode != 'close' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
+              WICK
+            </button>
+            <button type="button" id="slModeClose" onclick="setSlMode('close')"
+                    style="padding:2px 9px;font-size:10px;font-weight:700;border:none;border-radius:20px;cursor:pointer;letter-spacing:0.04em;
+                           background:{% if sl_mode == 'close' %}var(--gold){% else %}rgba(255,255,255,0.07){% endif %};
+                           color:{% if sl_mode == 'close' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
+              CLOSE
+            </button>
+          </div>
+          <input type="hidden" name="sl_mode" id="slModeInput" value="{{ sl_mode }}">
+        </div>
+
         <label class="sf-toggle">
           <input type="checkbox" name="ws_limit_on" id="wsLimitCheck"
                  {% if ws_limit_on %}checked{% endif %} onchange="toggleSection('wsLimitSection',this)">
@@ -991,6 +1010,22 @@ function toggleDualAtr(checkbox) {
   var pills = document.getElementById('dualAtrModePills');
   if (pills) {
     pills.style.display = checkbox.checked ? 'flex' : 'none';
+  }
+}
+
+function setSlMode(mode) {
+  var input    = document.getElementById('slModeInput');
+  var wickBtn  = document.getElementById('slModeWick');
+  var closeBtn = document.getElementById('slModeClose');
+  if (input) input.value = mode;
+  if (wickBtn && closeBtn) {
+    if (mode === 'wick') {
+      wickBtn.style.background  = 'var(--green)'; wickBtn.style.color  = '#000'; wickBtn.style.fontWeight  = '700';
+      closeBtn.style.background = 'rgba(255,255,255,0.07)'; closeBtn.style.color = 'var(--muted)'; closeBtn.style.fontWeight = '700';
+    } else {
+      closeBtn.style.background = 'var(--gold)';  closeBtn.style.color = '#000'; closeBtn.style.fontWeight = '700';
+      wickBtn.style.background  = 'rgba(255,255,255,0.07)'; wickBtn.style.color  = 'var(--muted)'; wickBtn.style.fontWeight = '700';
+    }
   }
 }
 

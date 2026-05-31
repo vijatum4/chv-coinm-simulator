@@ -124,6 +124,7 @@ def simulate_cycle_on_candles(
     slippage_pct: float = 0.0,
     start_direction: str = "LONG",
     max_whipsaws: int = 0,
+    sl_mode: str = 'wick',   # 'wick' = candle high/low, 'close' = candle close
 ) -> tuple[List[CycleStep], int, float, bool, float, int, float]:
     """
     Simulate one CHV cycle starting at start_idx.
@@ -174,7 +175,8 @@ def simulate_cycle_on_candles(
                 return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
 
             # Check SL (SP)
-            if candle.low <= sp:
+            sl_trigger = candle.close <= sp if sl_mode == 'close' else candle.low <= sp
+            if sl_trigger:
                 fee = lots * sp * fee_rate
                 slip = lots * sp * slippage_pct
                 total_fees += fee
@@ -224,7 +226,8 @@ def simulate_cycle_on_candles(
                 return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
 
             # Check SL (LP)
-            if candle.high >= lp:
+            sl_trigger = candle.close >= lp if sl_mode == 'close' else candle.high >= lp
+            if sl_trigger:
                 fee = lots * lp * fee_rate
                 slip = lots * lp * slippage_pct
                 total_fees += fee
@@ -282,6 +285,7 @@ def run_backtest(
     fixed_margin: float = 0.0,      # >0 = fixed USD margin per cycle; lots computed dynamically
     lot_step: float = 0.001,        # symbol lot step for rounding in fixed-margin mode
     dual_atr_mode: str = 'min',     # 'min' or 'max' — which ATR to use when dual is active
+    sl_mode: str = 'wick',          # 'wick' = high/low trigger, 'close' = close price trigger
 ) -> BacktestResult:
     from chv_engine import calculate_params
 
@@ -371,6 +375,7 @@ def run_backtest(
             cycle_lots, leverage, running_capital, fee_rate, slippage_pct,
             start_direction=start_direction,
             max_whipsaws=max_whipsaws,
+            sl_mode=sl_mode,
         )
 
         # No steps means the first-position margin check failed — skip this candle.

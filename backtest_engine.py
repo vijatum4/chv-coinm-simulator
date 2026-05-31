@@ -169,7 +169,7 @@ def simulate_cycle_on_candles(
                 fee = lots * tl * fee_rate
                 slip = lots * tl * slippage_pct
                 total_fees += fee
-                exit_pnl = (lots * d * leverage) - fee - slip
+                exit_pnl = (lots * d) - fee - slip
                 balance += exit_pnl
                 steps.append(CycleStep(
                     direction="EXIT_LONG", trigger_price=tl, lots=0,
@@ -184,7 +184,7 @@ def simulate_cycle_on_candles(
                 fee = lots * sp * fee_rate
                 slip = lots * sp * slippage_pct
                 total_fees += fee
-                loss = -(lots * c * leverage) - fee - slip
+                loss = -(lots * c) - fee - slip
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:
@@ -228,7 +228,7 @@ def simulate_cycle_on_candles(
                 fee = lots * ts_level * fee_rate
                 slip = lots * ts_level * slippage_pct
                 total_fees += fee
-                exit_pnl = (lots * d * leverage) - fee - slip
+                exit_pnl = (lots * d) - fee - slip
                 balance += exit_pnl
                 steps.append(CycleStep(
                     direction="EXIT_SHORT", trigger_price=ts_level, lots=0,
@@ -243,7 +243,7 @@ def simulate_cycle_on_candles(
                 fee = lots * lp * fee_rate
                 slip = lots * lp * slippage_pct
                 total_fees += fee
-                loss = -(lots * c * leverage) - fee - slip
+                loss = -(lots * c) - fee - slip
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:

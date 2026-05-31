@@ -1060,7 +1060,7 @@ function toggleFixedMargin(checkbox) {
   const baseLotsLabel = document.getElementById('baseLotsLabel');
   if (section) section.style.display = checkbox.checked ? '' : 'none';
   if (baseLotsInput) {
-    baseLotsInput.disabled  = checkbox.checked;
+    baseLotsInput.readOnly = checkbox.checked;
     baseLotsInput.style.opacity = checkbox.checked ? '0.38' : '';
     baseLotsInput.style.cursor  = checkbox.checked ? 'not-allowed' : '';
   }

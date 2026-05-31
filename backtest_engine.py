@@ -149,10 +149,14 @@ def simulate_cycle_on_candles(
     if (lots * initial_price) / leverage > capital:
         return steps, start_idx, 0.0, False, 0.0, 0, 0.0
 
-    # Step 1: open in start_direction
+    # Step 1: open in start_direction — charge entry open fee + slippage
+    entry_fee  = lots * initial_price * fee_rate
+    entry_slip = lots * initial_price * slippage_pct
+    total_fees += entry_fee
+    balance    -= (entry_fee + entry_slip)
     steps.append(CycleStep(
         direction=direction, trigger_price=initial_price, lots=lots,
-        pnl=0.0, candle_idx=start_idx,
+        pnl=round(-(entry_fee + entry_slip), 4), candle_idx=start_idx,
         timestamp=candles[start_idx].timestamp,
     ))
 
@@ -192,6 +196,14 @@ def simulate_cycle_on_candles(
 
                 if margin_needed > capital or abs(balance) > capital:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
+
+                # Charge open fee + slippage for the new SHORT position
+                open_fee  = next_lots * sp * fee_rate
+                open_slip = next_lots * sp * slippage_pct
+                total_fees += open_fee
+                balance    -= (open_fee + open_slip)
+                if balance < peak_intra_loss:
+                    peak_intra_loss = balance
 
                 steps.append(CycleStep(
                     direction="SHORT", trigger_price=sp, lots=next_lots,
@@ -243,6 +255,14 @@ def simulate_cycle_on_candles(
 
                 if margin_needed > capital or abs(balance) > capital:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
+
+                # Charge open fee + slippage for the new LONG position
+                open_fee  = next_lots * lp * fee_rate
+                open_slip = next_lots * lp * slippage_pct
+                total_fees += open_fee
+                balance    -= (open_fee + open_slip)
+                if balance < peak_intra_loss:
+                    peak_intra_loss = balance
 
                 steps.append(CycleStep(
                     direction="LONG", trigger_price=lp, lots=next_lots,

@@ -1073,17 +1073,22 @@ function toggleFixedMargin(checkbox) {
 }
 
 function updateFixedMarginPreview() {
-  const price = parseFloat(document.getElementById('priceInput')?.value);
-  const margin = parseFloat(document.getElementById('targetMarginInput')?.value);
+  const price    = parseFloat(document.getElementById('priceInput')?.value);
+  const margin   = parseFloat(document.getElementById('targetMarginInput')?.value);
   const leverage = parseInt(document.getElementById('leverageRange')?.value || '10');
   const step = {{ lot_step }};
   const dec  = {{ lot_dec }};
   const baseLotsInput = document.getElementById('baseLotsInput');
   const baseLotsLabel = document.getElementById('baseLotsLabel');
-  if (!price || !margin || isNaN(price) || isNaN(margin) || step <= 0) return;
+  const note = document.getElementById('lotsUsdNote');
+  if (!margin || isNaN(margin)) return;
+  if (!price || isNaN(price) || price <= 0) {
+    if (note) { note.textContent = 'Fetch price first to preview lots'; note.style.display = 'block'; }
+    return;
+  }
+  if (step <= 0) return;
   const stepsCount = Math.floor(margin * leverage / price / step);
   const lots = parseFloat((stepsCount * step).toFixed(dec));
-  const actualMargin = (lots * price / leverage).toFixed(2);
   if (baseLotsInput) baseLotsInput.value = lots.toFixed(dec);
   if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots (' + _currentBase() + ')';
   updateLotsUsd(price);

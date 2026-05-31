@@ -1085,7 +1085,7 @@ function updateFixedMarginPreview() {
   const lots = parseFloat((stepsCount * step).toFixed(dec));
   const actualMargin = (lots * price / leverage).toFixed(2);
   if (baseLotsInput) baseLotsInput.value = lots.toFixed(dec);
-  if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots (' + _currentBase() + ') · $' + actualMargin + ' margin';
+  if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots (' + _currentBase() + ')';
   updateLotsUsd(price);
 }
 

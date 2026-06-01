@@ -121,6 +121,7 @@ def simulate_cycle_on_candles(
     leverage: float,
     capital: float,
     fee_rate: float,
+    fee_rate_maker: float = 0.0002,  # TP fills only (limit orders = maker)
     slippage_pct: float = 0.0,
     start_direction: str = "LONG",
     max_whipsaws: int = 0,
@@ -164,9 +165,9 @@ def simulate_cycle_on_candles(
         candle = candles[idx]
 
         if direction == "LONG":
-            # Check TP first (TL)
+            # Check TP first (TL) — limit order = maker fee
             if candle.high >= tl:
-                fee = lots * tl * fee_rate
+                fee = lots * tl * fee_rate_maker
                 slip = lots * tl * slippage_pct
                 total_fees += fee
                 exit_pnl = (lots * d) - fee - slip
@@ -223,9 +224,9 @@ def simulate_cycle_on_candles(
                     return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
 
         else:  # SHORT
-            # Check TP first (TS)
+            # Check TP first (TS) — limit order = maker fee
             if candle.low <= ts_level:
-                fee = lots * ts_level * fee_rate
+                fee = lots * ts_level * fee_rate_maker
                 slip = lots * ts_level * slippage_pct
                 total_fees += fee
                 exit_pnl = (lots * d) - fee - slip
@@ -294,7 +295,8 @@ def run_backtest(
     base_lots: float = 1.0,
     leverage: float = 10.0,
     capital: float = 1000.0,
-    fee_rate: float = 0.0005,
+    fee_rate: float = 0.0005,        # taker rate (entry, SL close, inversion open)
+    fee_rate_maker: float = 0.0002,  # maker rate (TP close — limit order)
     buffer: float = 0.8,
     slippage_pct: float = 0.0,
     reward_ratio: float = 2.5,
@@ -392,7 +394,7 @@ def run_backtest(
             trading_candles, i,
             params.lp, params.sp, params.tl, params.ts,
             params.c, params.d,
-            cycle_lots, leverage, running_capital, fee_rate, slippage_pct,
+            cycle_lots, leverage, running_capital, fee_rate, fee_rate_maker, slippage_pct,
             start_direction=start_direction,
             max_whipsaws=max_whipsaws,
             sl_mode=sl_mode,

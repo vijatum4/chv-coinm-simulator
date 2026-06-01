@@ -103,6 +103,7 @@ def _sidebar_defaults():
         leverage=10,              # matches Streamlit default
         capital=1000.0,
         fee_rate_pct=0.05,
+        maker_fee_pct=0.02,
         slippage_label='0.05% — Liquid pairs (BTC / ETH)',  # matches Streamlit default index=1
         ws_limit_on=False,
         ws_limit=7,               # matches Streamlit default
@@ -143,7 +144,7 @@ def _parse_sidebar(form, sess):
             pass
 
     for key in ('price_val', 'atr_val', 'efficiency_buffer', 'reward_ratio',
-                'base_lots', 'capital', 'fee_rate_pct', 'atr_guard_multiplier', 'target_margin'):
+                'base_lots', 'capital', 'fee_rate_pct', 'maker_fee_pct', 'atr_guard_multiplier', 'target_margin'):
         try:
             d[key] = float(src[key])
         except (KeyError, TypeError, ValueError):
@@ -470,6 +471,7 @@ def _bt_worker(job_id: str):
             leverage=int(d['leverage']),
             capital=d['capital'],
             fee_rate=d['fee_rate_pct'] / 100.0,
+            fee_rate_maker=d.get('maker_fee_pct', 0.02) / 100.0,
             buffer=d['efficiency_buffer'],
             slippage_pct=d.get('slip_pct', 0.0005),
             reward_ratio=d['reward_ratio'],

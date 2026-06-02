@@ -51,22 +51,14 @@ TF_RULE = {
 
 # CoinM contract specs: (min_contracts, step, decimals)
 # All CoinM symbols use integer contracts (step=1), face_value from coinm_contract_size()
-LOT_SPECS = {
-    'BTCUSD_PERP':  (1, 1, 0),   # $100/contract
-    'ETHUSD_PERP':  (1, 1, 0),   # $10/contract
-    'BNBUSD_PERP':  (1, 1, 0),
-    'XRPUSD_PERP':  (1, 1, 0),
-    'ADAUSD_PERP':  (1, 1, 0),
-    'DOTUSD_PERP':  (1, 1, 0),
-    'LINKUSD_PERP': (1, 1, 0),
-    'LTCUSD_PERP':  (1, 1, 0),
-    'BCHUSD_PERP':  (1, 1, 0),
-    'SOLUSD_PERP':  (1, 1, 0),
-    'AVAXUSD_PERP': (1, 1, 0),
-    'DOGEUSD_PERP': (1, 1, 0),
-    'TRXUSD_PERP':  (1, 1, 0),
-    'ETCUSD_PERP':  (1, 1, 0),
-}
+# All CoinM symbols: integer contracts, step=1, dec=0. BTC=$100/contract, others=$10.
+LOT_SPECS = {s: (1, 1, 0) for s in [
+    'AAVEUSD_PERP', 'ADAUSD_PERP', 'AVAXUSD_PERP', 'BCHUSD_PERP',
+    'BNBUSD_PERP',  'BTCUSD_PERP', 'DOGEUSD_PERP', 'DOTUSD_PERP',
+    'ETCUSD_PERP',  'ETHUSD_PERP', 'FILUSD_PERP',  'LINKUSD_PERP',
+    'LTCUSD_PERP',  'NEARUSD_PERP','SOLUSD_PERP',  'SUIUSD_PERP',
+    'TRXUSD_PERP',  'UNIUSD_PERP', 'XLMUSD_PERP',  'XRPUSD_PERP',
+]}
 MAX_STEPS = 50
 
 
@@ -178,7 +170,7 @@ def _parse_sidebar(form, sess):
 
 
 def _save_to_session(d):
-    skip = {'slip_pct', 'base_asset', 'settle_coin', 'lot_min', 'lot_step', 'lot_dec'}
+    skip = {'slip_pct', 'base_asset', 'settle_coin', 'lot_min', 'lot_step', 'lot_dec', 'face_value'}
     for k, v in d.items():
         if k not in skip:
             session[k] = v
@@ -505,7 +497,6 @@ def _bt_worker(job_id: str):
 
 # ── Shared template context ────────────────────────────────────────────────────
 def _ctx(d, mode):
-    usdm_syms = get_available_symbols()
     return dict(
         **d,
         mode=mode,
@@ -514,7 +505,7 @@ def _ctx(d, mode):
         tf_choices=TF_CHOICES,
         tf_rule=TF_RULE,
         lot_specs=LOT_SPECS,
-        available_symbols=usdm_syms,
+        available_symbols=get_coinm_symbols(),
     )
 
 

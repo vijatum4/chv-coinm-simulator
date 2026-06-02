@@ -166,7 +166,7 @@
       <div class="param"><div class="lbl">Buffer</div><div class="val">{{ efficiency_buffer }}</div></div>
       <div class="param"><div class="lbl">Reward Ratio</div><div class="val">{{ reward_ratio }}</div></div>
       <div class="param">
-        <div class="lbl">Base Lots</div>
+        <div class="lbl">Base Contracts</div>
         <div class="val"{% if fixed_margin_on %} style="opacity:0.45"{% endif %}>{{ base_lots }}{% if fixed_margin_on %}<span style="font-size:9px;margin-left:2px;opacity:0.7">≈</span>{% endif %}</div>
       </div>
       <div class="param"><div class="lbl">Leverage</div><div class="val">{{ leverage }}×</div></div>
@@ -184,7 +184,7 @@
         <div class="val">{% if ws_limit_on %}≤{{ ws_limit }}{% else %}Off{% endif %}</div>
       </div>
       <div class="param dim">
-        <div class="lbl">$5 Notional</div>
+        <div class="lbl">Min Notional</div>
         <div class="val">{{ 'On' if min_notional_on else 'Off' }}</div>
       </div>
       <div class="param dim">
@@ -216,7 +216,7 @@
         {% else %}
         The next inversion required more margin than available capital.
         {% endif %}
-        Reduce base lots, lower leverage, or increase capital.
+        Reduce base contracts, lower leverage, or increase capital.
       </div>
     </div>
   </div>
@@ -232,11 +232,11 @@
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Last Position</div>
-      <div class="liq-val">{{ liq_detail.last_lots }} lots</div>
+      <div class="liq-val">{{ liq_detail.last_lots }} contracts</div>
     </div>
     <div class="liq-card">
-      <div class="liq-lbl">Lots Needed</div>
-      <div class="liq-val{% if liq_detail.reason == 'margin' %} liq-bad{% endif %}">{{ liq_detail.failed_lots }} lots</div>
+      <div class="liq-lbl">Contracts Needed</div>
+      <div class="liq-val{% if liq_detail.reason == 'margin' %} liq-bad{% endif %}">{{ liq_detail.failed_lots }} contracts</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">@ SL Price</div>
@@ -269,10 +269,10 @@
   <div style="display:flex;align-items:flex-start;gap:10px">
     <span style="font-size:20px;line-height:1.1;flex-shrink:0">🚫</span>
     <div>
-      <strong style="font-size:14px">Order Rejected — Cycle #{{ result.min_notional_cycle }} would not meet Binance $5 min notional</strong>
+      <strong style="font-size:14px">Order Rejected — Cycle #{{ result.min_notional_cycle }} would not meet minimum notional (1 contract)</strong>
       <div style="font-size:12px;margin-top:3px;color:var(--neg);opacity:0.85">
-        The WS1 inversion lot at this cycle's price falls below Binance's $5 minimum notional requirement — the order would be rejected in live trading.
-        Increase base lots or wait for a higher-priced entry.
+        The WS1 inversion at this cycle would be less than 1 contract — the order would be rejected in live trading.
+        Increase base contracts.
       </div>
     </div>
   </div>
@@ -287,16 +287,16 @@
       <div class="liq-val">{{ cur }}{{ '{:,.4f}'.format(mn_detail.entry_price) }}</div>
     </div>
     <div class="liq-card">
-      <div class="liq-lbl">WS1 Inv Lots</div>
-      <div class="liq-val liq-bad">{{ mn_detail.inv_lots }} lots</div>
+      <div class="liq-lbl">WS1 Inv Contracts</div>
+      <div class="liq-val liq-bad">{{ mn_detail.inv_lots }} contracts</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">WS1 Notional</div>
       <div class="liq-val liq-bad">{{ cur }}{{ '{:,.4f}'.format(mn_detail.inv_notional) }}</div>
     </div>
     <div class="liq-card">
-      <div class="liq-lbl">Min Base Lots</div>
-      <div class="liq-val">{{ mn_detail.min_base }} lots</div>
+      <div class="liq-lbl">Min Base Contracts</div>
+      <div class="liq-val">{{ mn_detail.min_base }} contracts</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Cycles Completed</div>
@@ -369,7 +369,7 @@
     <div class="stat-lbl">Max Whipsaws</div>
     <div class="stat-val mono">{{ top6[0][0] if top6 else 0 }}</div>
     {% if top6 %}
-    <div class="stat-foot muted-foot">{{ top6[0][1] }} lots · m ${{ '{:,.2f}'.format(top6[0][2]) }}</div>
+    <div class="stat-foot muted-foot">{{ top6[0][1] }} contracts · m ${{ '{:,.2f}'.format(top6[0][2]) }}</div>
     {% else %}
     <div class="stat-note">—</div>
     {% endif %}
@@ -622,7 +622,7 @@
           <th>Capital After</th>
           <th>P&amp;L</th>
           <th>Position</th>
-          <th>Lots</th>
+          <th>Contracts</th>
           <th>Entry</th>
           <th>TP</th>
           <th>ATR {{ atr_period }}{% if dual_atr_on %}/{{ atr_period_2 }}{% endif %}</th>

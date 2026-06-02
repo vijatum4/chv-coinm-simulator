@@ -758,17 +758,17 @@ input[type=range].sf-range::-moz-range-track{
         <span class="sb-label">Position &amp; Capital</span>
 
         <div class="sf-row" style="margin-bottom:4px">
-          <label class="sf-field-label" id="baseLotsLabel">Base Lots ({{ base_asset }})</label>
+          <label class="sf-field-label" id="baseLotsLabel">Base Contracts ({{ base_asset }})</label>
           <input class="sf-input mono" type="number" name="base_lots" id="baseLotsInput"
                  value="{{ base_lots }}" step="{{ lot_step }}" min="{{ lot_min }}"
-                 oninput="updateLotsUsd()">
+                 oninput="updateContractsNote()">
         </div>
         <div id="lotsUsdNote" style="display:none;font-size:10.5px;color:var(--muted);margin-top:-2px;margin-bottom:4px;line-height:1.4"></div>
         <label class="sf-toggle" style="margin-bottom:6px">
           <input type="checkbox" name="min_notional_on" id="minNotionalCheck"
                  {% if min_notional_on %}checked{% endif %}
-                 onchange="updateLotsUsd()">
-          <span class="sf-toggle-lbl">Binance $5 Min Notional</span>
+                 onchange="updateContractsNote()">
+          <span class="sf-toggle-lbl">Min Notional (1 contract)</span>
         </label>
         <label class="sf-toggle" style="margin-bottom:10px">
           <input type="checkbox" name="fixed_margin_on" id="fixedMarginCheck"
@@ -783,7 +783,7 @@ input[type=range].sf-range::-moz-range-track{
                    value="{{ target_margin }}" step="1" min="1"
                    oninput="updateFixedMarginPreview()">
           </div>
-          <div class="sf-caption" style="margin-top:6px;margin-bottom:10px">Lots = target × leverage ÷ price · rounded down to lot step</div>
+          <div class="sf-caption" style="margin-top:6px;margin-bottom:10px">Contracts = target × leverage ÷ face_value · price-independent</div>
         </div>
 
         <div class="sf-slider-row">
@@ -896,21 +896,26 @@ const _LOT_SPECS = {{ lot_specs | tojson }};
 function _lotStep() {
   var sym = document.getElementById('symbolSelect')?.value
          || document.querySelector('[name=symbol]')?.value || '';
-  return (_LOT_SPECS[sym] || [0.001, 0.001, 3])[1];
+  return (_LOT_SPECS[sym] || [1, 1, 0])[1];
 }
 function _lotDec() {
   var sym = document.getElementById('symbolSelect')?.value
          || document.querySelector('[name=symbol]')?.value || '';
-  return (_LOT_SPECS[sym] || [0.001, 0.001, 3])[2];
+  return (_LOT_SPECS[sym] || [1, 1, 0])[2];
+}
+function _faceValue() {
+  var sym = document.getElementById('symbolSelect')?.value
+         || document.querySelector('[name=symbol]')?.value || '';
+  return sym.startsWith('BTC') ? 100 : 10;
 }
 
 function updateAssetLabels(symbolVal) {
-  const base = (symbolVal || '').replace('USDT','').replace('BUSD','').replace('USD_PERP','');
+  const base = (symbolVal || '').replace('USD_PERP','').replace('USDT','').replace('BUSD','');
   const lotsLbl = document.getElementById('baseLotsLabel');
   if (!lotsLbl) return;
   const isFixed = document.getElementById('fixedMarginCheck')?.checked;
   if (isFixed) updateFixedMarginPreview();
-  else lotsLbl.textContent = `Base Lots (${base})`;
+  else lotsLbl.textContent = `Base Contracts (${base})`;
 }
 
 function updateAtrTf(sel) {
@@ -958,7 +963,7 @@ function setFetchMode(mode) {
 
 function fetchPriceAtr() {
   const sym = document.getElementById('symbolSelect')?.value
-           || document.querySelector('[name=symbol]')?.value || 'SOLUSDT';
+           || document.querySelector('[name=symbol]')?.value || 'BTCUSD_PERP';
   const atrTf = document.getElementById('atrTfHidden').value;
   const period = document.querySelector('[name=atr_period]').value;
   const dualOn = document.getElementById('dualAtrCheck')?.checked;
@@ -1005,7 +1010,7 @@ function fetchPriceAtr() {
         if (document.getElementById('fixedMarginCheck')?.checked) {
           updateFixedMarginPreview();
         } else {
-          updateLotsUsd(data.price);
+          updateContractsNote();
         }
       } else {
         statusEl.textContent = '✗ ' + (data.error || 'Failed');
@@ -1069,7 +1074,7 @@ function setDualAtrMode(mode) {
 function _currentBase() {
   var sym = document.getElementById('symbolSelect')?.value
          || document.querySelector('[name=symbol]')?.value || '';
-  return sym.replace('USDT','').replace('BUSD','').replace('USD_PERP','') || '{{ base_asset }}';
+  return sym.replace('USD_PERP','').replace('USDT','').replace('BUSD','') || '{{ base_asset }}';
 }
 
 function toggleFixedMargin(checkbox) {
@@ -1085,31 +1090,29 @@ function toggleFixedMargin(checkbox) {
   if (checkbox.checked) {
     updateFixedMarginPreview();
   } else {
-    if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots (' + _currentBase() + ')';
-    updateLotsUsd();
+    if (baseLotsLabel) baseLotsLabel.textContent = 'Base Contracts (' + _currentBase() + ')';
+    updateContractsNote();
   }
 }
 
 function updateFixedMarginPreview() {
-  const price    = parseFloat(document.getElementById('priceInput')?.value);
+  // CoinM: margin = contracts × face_value / leverage → price-independent
   const margin   = parseFloat(document.getElementById('targetMarginInput')?.value);
   const leverage = parseInt(document.getElementById('leverageRange')?.value || '10');
+  const fv   = _faceValue();
   const step = _lotStep();
   const dec  = _lotDec();
   const baseLotsInput = document.getElementById('baseLotsInput');
   const baseLotsLabel = document.getElementById('baseLotsLabel');
   const note = document.getElementById('lotsUsdNote');
-  if (!margin || isNaN(margin)) return;
-  if (!price || isNaN(price) || price <= 0) {
-    if (note) { note.textContent = 'Fetch price first to preview lots'; note.style.display = 'block'; }
-    return;
+  if (!margin || isNaN(margin) || step <= 0) return;
+  const contracts = Math.floor(margin * leverage / fv / step) * step;
+  if (baseLotsInput) baseLotsInput.value = contracts.toFixed(dec);
+  if (baseLotsLabel) baseLotsLabel.textContent = 'Base Contracts (' + _currentBase() + ')';
+  if (note) {
+    note.textContent = contracts + ' contracts × $' + fv + ' = $' + (contracts * fv).toLocaleString() + ' notional · margin $' + (contracts * fv / leverage).toFixed(2);
+    note.style.display = 'block';
   }
-  if (step <= 0) return;
-  const stepsCount = Math.floor(margin * leverage / price / step);
-  const lots = parseFloat((stepsCount * step).toFixed(dec));
-  if (baseLotsInput) baseLotsInput.value = lots.toFixed(dec);
-  if (baseLotsLabel) baseLotsLabel.textContent = 'Base Lots (' + _currentBase() + ')';
-  updateLotsUsd(price);
 }
 
 // On page load, restore fixed-margin grayed state if toggle is already checked
@@ -1201,7 +1204,7 @@ function exportCsv(btn) {
   var filename = 'chv_backtest.csv';
   if (btn) {
     var d = btn.dataset;
-    var sym    = (d.symbol || 'UNKNOWN').replace('USDT','').replace('BUSD','');
+    var sym    = (d.symbol || 'UNKNOWN').replace('USD_PERP','').replace('USDT','').replace('BUSD','');
     var tf     = (d.tf     || '').replace('m','m').toUpperCase();
     var buf    = d.buffer  || '';
     var rr     = d.rr     || '';
@@ -1219,7 +1222,7 @@ function exportCsv(btn) {
       'CHV', sym, tf,
       'buf' + buf,
       'rr'  + rr,
-      lots  + 'lots',
+      lots  + 'contracts',
       lev   + 'x',
       capK,
       days  + 'd',
@@ -1236,33 +1239,28 @@ function exportCsv(btn) {
   document.body.removeChild(a);
 }
 
-function updateLotsUsd(price) {
+function updateContractsNote() {
+  // CoinM: notional = contracts × face_value (price-independent)
   var note = document.getElementById('lotsUsdNote');
   if (!note) return;
-  if (price === undefined) {
-    var p = parseFloat(document.getElementById('priceInput')?.value);
-    if (!p || isNaN(p)) { note.style.display = 'none'; return; }
-    price = p;
-  }
-  var lots = parseFloat(document.getElementById('baseLotsInput')?.value);
-  if (!lots || isNaN(lots) || lots <= 0) { note.style.display = 'none'; return; }
-  var usd = lots * price;
-  var fmt = usd >= 1000
-    ? '$' + (usd / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
-    : '$' + usd.toFixed(2);
-  var html = '≈ ' + fmt + ' notional';
-  var min5On = document.getElementById('minNotionalCheck')?.checked;
-  if (min5On) {
-    var step = _lotStep();
-    var dec  = _lotDec();
-    var invNotional = lots * 0.5 * price;
-    if (invNotional < 5) {
-      var minBase = Math.ceil((10 / price) / step) * step;
-      html += '<br><span style="color:var(--gold)">⚠ WS1 inversion $' + invNotional.toFixed(2)
-            + ' &lt; $5 min — need ≥ ' + minBase.toFixed(dec) + ' lots</span>';
+  var contracts = parseFloat(document.getElementById('baseLotsInput')?.value);
+  if (!contracts || isNaN(contracts) || contracts <= 0) { note.style.display = 'none'; return; }
+  var fv = _faceValue();
+  var notional = contracts * fv;
+  var fmt = notional >= 1000
+    ? '$' + (notional / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+    : '$' + notional.toFixed(0);
+  var html = contracts + ' contracts × $' + fv + ' = ' + fmt + ' notional';
+  var minOn = document.getElementById('minNotionalCheck')?.checked;
+  if (minOn) {
+    var invContracts = contracts * 0.5;
+    var invNotional  = invContracts * fv;
+    if (invNotional < fv) {
+      html += '<br><span style="color:var(--gold)">⚠ WS1 inversion ' + invContracts
+            + ' contracts &lt; 1 minimum — increase base contracts</span>';
     } else {
-      html += '<br><span style="color:var(--green)">✓ WS1 inversion $' + invNotional.toFixed(2)
-            + ' meets $5 min</span>';
+      html += '<br><span style="color:var(--green)">✓ WS1 inversion $' + invNotional.toFixed(0)
+            + ' meets min notional</span>';
     }
   }
   note.innerHTML = html;

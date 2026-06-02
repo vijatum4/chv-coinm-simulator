@@ -783,7 +783,11 @@ input[type=range].sf-range::-moz-range-track{
                    value="{{ target_margin }}" step="1" min="1"
                    oninput="updateFixedMarginPreview()">
           </div>
-          <div class="sf-caption" style="margin-top:6px;margin-bottom:10px">Contracts = target × leverage ÷ face_value · price-independent</div>
+          <div class="sf-caption" style="margin-top:6px;margin-bottom:6px">Contracts = target × leverage ÷ face_value · price-independent</div>
+          <div id="wsRiskTable" style="display:none;margin-bottom:10px">
+            <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:5px">Margin per WS Level</div>
+            <div id="wsRiskRows" style="font-family:'JetBrains Mono',monospace;font-size:10.5px"></div>
+          </div>
         </div>
 
         <div class="sf-slider-row">
@@ -793,7 +797,7 @@ input[type=range].sf-range::-moz-range-track{
           </div>
           <input class="sf-range" type="range" id="leverageRange" name="leverage"
                  min="1" max="50" step="1" value="{{ leverage }}"
-                 oninput="document.getElementById('leverageBadge').textContent=this.value+'×'; if(document.getElementById('fixedMarginCheck')?.checked) updateFixedMarginPreview()">
+                 oninput="document.getElementById('leverageBadge').textContent=this.value+'×'; if(document.getElementById('fixedMarginCheck')?.checked) updateFixedMarginPreview(); else updateContractsNote()">
         </div>
 
         <div class="sf-row">
@@ -1092,6 +1096,8 @@ function toggleFixedMargin(checkbox) {
   } else {
     if (baseLotsLabel) baseLotsLabel.textContent = 'Base Contracts (' + _currentBase() + ')';
     updateContractsNote();
+    const t = document.getElementById('wsRiskTable');
+    if (t) t.style.display = 'none';
   }
 }
 
@@ -1113,6 +1119,55 @@ function updateFixedMarginPreview() {
     note.textContent = contracts + ' contracts × $' + fv + ' = $' + (contracts * fv).toLocaleString() + ' notional · margin $' + (contracts * fv / leverage).toFixed(2);
     note.style.display = 'block';
   }
+  updateWSRisk(contracts, leverage, fv);
+}
+
+function updateWSRisk(baseContracts, leverage, fv) {
+  const tableEl = document.getElementById('wsRiskTable');
+  const rowsEl  = document.getElementById('wsRiskRows');
+  if (!tableEl || !rowsEl) return;
+  if (!baseContracts || baseContracts <= 0) { tableEl.style.display = 'none'; return; }
+
+  const price      = parseFloat(document.getElementById('priceInput')?.value);
+  const capitalAsset = parseFloat(document.getElementById('capitalInput')?.value);
+  const hasPrice   = price > 0 && !isNaN(price);
+  const hasCap     = capitalAsset > 0 && !isNaN(capitalAsset);
+  const capitalUsd = hasCap && hasPrice ? capitalAsset * price : null;
+
+  // WS scaling: WS0=base, WS1=base×0.5, WS2+=prev×1.5
+  const levels = [];
+  let lots = baseContracts;
+  for (let ws = 0; ws <= 8; ws++) {
+    const m = lots * fv / leverage;
+    const mAsset = hasPrice ? m / price : null;
+    const danger = capitalUsd !== null && m > capitalUsd;
+    levels.push({ ws, lots: Math.round(lots), m, mAsset, danger });
+    lots = ws === 0 ? Math.floor(baseContracts * 0.5) : Math.floor(lots * 1.5);
+    if (lots <= 0) break;
+  }
+
+  const base = _currentBase();
+  const assetCol = hasPrice ? `<span style="min-width:60px;text-align:right;color:var(--green)">${base}</span>` : '';
+  let html = `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid var(--line);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)">
+    <span style="min-width:28px">WS</span>
+    <span style="min-width:52px;text-align:right">Contracts</span>
+    <span style="min-width:52px;text-align:right">Margin</span>
+    ${hasPrice ? `<span style="min-width:60px;text-align:right">${base}</span>` : ''}
+  </div>`;
+
+  for (const r of levels) {
+    const color = r.danger ? 'var(--neg)' : 'var(--beige)';
+    const icon  = r.danger ? ' ⚠' : '';
+    html += `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid var(--line);color:${color}">
+      <span style="min-width:28px;color:var(--muted)">${r.ws}</span>
+      <span style="min-width:52px;text-align:right">${r.lots}</span>
+      <span style="min-width:52px;text-align:right">$${r.m.toFixed(0)}${icon}</span>
+      ${r.mAsset !== null ? `<span style="min-width:60px;text-align:right;color:${r.danger ? 'var(--neg)' : 'var(--green)'}">${r.mAsset.toFixed(4)}</span>` : ''}
+    </div>`;
+  }
+
+  rowsEl.innerHTML = html;
+  tableEl.style.display = '';
 }
 
 // On page load, restore fixed-margin grayed state if toggle is already checked

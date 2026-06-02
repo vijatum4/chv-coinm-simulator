@@ -690,6 +690,7 @@ def bt_result_view(job_id):
     total_pnl_btc = sum(pnl_btc_list)
     fees_btc = result.total_fees / conversion_price
     worst_intra_btc = result.worst_intra_loss / conversion_price
+    max_drawdown_btc = result.max_drawdown / conversion_price
 
     # Running BTC capital for cap_at_worst
     cap_btc_running = capital_btc
@@ -808,6 +809,7 @@ def bt_result_view(job_id):
                            total_pnl_btc=total_pnl_btc,
                            fees_btc=fees_btc,
                            worst_intra_btc=worst_intra_btc,
+                           max_drawdown_btc=max_drawdown_btc,
                            cap_btc_at_worst=cap_btc_at_worst,
                            total_trades=total_trades,
                            growth_pct=growth_pct,

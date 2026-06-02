@@ -337,7 +337,7 @@
   <div class="stat">
     <div class="stat-lbl">Worst Cycle Loss</div>
     <div class="stat-val mono neg">{{ worst_intra_btc | btcfmt }} {{ currency_sym }}</div>
-    <div class="stat-foot neg-foot">intra-cycle · cycle {{ result.worst_intra_loss_cycle }}</div>
+    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cap_btc_at_worst | coinfmt }} {{ currency_sym }}</div>
   </div>
 
   <div class="stat">

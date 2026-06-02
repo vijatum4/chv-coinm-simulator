@@ -358,7 +358,7 @@
   <div class="stat">
     <div class="stat-lbl">Total Fees Paid</div>
     <div class="stat-val mono neg">{{ (fees_btc * -1) | btcfmt }} {{ currency_sym }}</div>
-    <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }} t</div>
+    <div class="stat-foot neg-foot">{{ fee_rate_pct }}% · ${{ '{:,.2f}'.format(result.total_fees) }}</div>
   </div>
 
 </div>

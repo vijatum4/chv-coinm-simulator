@@ -328,16 +328,18 @@
     </div>
   </div>
 
+  {% set dd_col = '#E63946' if drawdown_pct > 20 else ('#FADD56' if drawdown_pct > 5 else '#39C3C4') %}
   <div class="stat">
     <div class="stat-lbl">Max Drawdown</div>
-    <div class="stat-val mono neg">{{ (max_drawdown_btc * -1) | btcfmt }} {{ currency_sym }}</div>
-    <div class="stat-foot neg-foot">peak-to-trough · cycle {{ result.max_drawdown_cycle }}</div>
+    <div class="stat-val mono" style="color:{{ dd_col }}">{{ (max_drawdown_btc * -1) | btcfmt }} {{ currency_sym }}</div>
+    <div class="stat-foot" style="background:{{ dd_col }}22;color:{{ dd_col }}">{{ drawdown_pct }}% · cycle {{ result.max_drawdown_cycle }}</div>
   </div>
 
+  {% set wl_col = '#E63946' if worst_pct > 30 else ('#FADD56' if worst_pct > 10 else '#39C3C4') %}
   <div class="stat">
     <div class="stat-lbl">Worst Cycle Loss</div>
-    <div class="stat-val mono neg">{{ worst_intra_btc | btcfmt }} {{ currency_sym }}</div>
-    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cap_btc_at_worst | coinfmt }} {{ currency_sym }}</div>
+    <div class="stat-val mono" style="color:{{ wl_col }}">{{ worst_intra_btc | btcfmt }} {{ currency_sym }}</div>
+    <div class="stat-foot" style="background:{{ wl_col }}22;color:{{ wl_col }}">cycle {{ result.worst_intra_loss_cycle }} · {{ cap_btc_at_worst | coinfmt }} {{ currency_sym }}</div>
   </div>
 
   <div class="stat">
@@ -369,11 +371,13 @@
     <div class="stat-foot muted-foot">per cycle</div>
   </div>
 
+  {% set actual_ws = top6[0][0] if top6 else 0 %}
+  {% set ws_col = '#E63946' if actual_ws >= ws_red_thresh else ('#FADD56' if actual_ws >= ws_gold_thresh else '#39C3C4') %}
   <div class="stat">
     <div class="stat-lbl">Max Whipsaws</div>
-    <div class="stat-val mono">{{ top6[0][0] if top6 else 0 }}</div>
+    <div class="stat-val mono" style="color:{{ ws_col }}">{{ actual_ws }}</div>
     {% if top6 %}
-    <div class="stat-foot muted-foot">c {{ top6[0][1] }} · m ${{ '{:,.2f}'.format(top6[0][2]) }}</div>
+    <div class="stat-foot" style="background:{{ ws_col }}22;color:{{ ws_col }};letter-spacing:-0.03em;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:500">c {{ top6[0][1] }} · m ${{ '{:,.2f}'.format(top6[0][2]) }} · cap {{ max_theoretical_ws }}</div>
     {% else %}
     <div class="stat-note">—</div>
     {% endif %}

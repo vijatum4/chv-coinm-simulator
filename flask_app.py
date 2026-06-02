@@ -816,7 +816,6 @@ def bt_result_view(job_id):
                            liq_detail=liq_detail,
                            mn_detail=mn_detail,
                            currency_sym=base_asset,
-                           base_asset=base_asset,
                            **_ctx(d, 'backtest'))
 
 

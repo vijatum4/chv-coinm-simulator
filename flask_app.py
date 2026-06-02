@@ -515,6 +515,11 @@ def _ctx(d, mode):
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
+@app.route('/')
+def root():
+    return redirect('/sim/')
+
+
 @app.route('/sim')
 @app.route('/sim/')
 def sim_root():

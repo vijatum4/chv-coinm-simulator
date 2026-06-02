@@ -348,7 +348,7 @@ def get_coinm_symbols() -> list:
         perps = [
             s['symbol'] for s in data.get('symbols', [])
             if s.get('contractType') == 'PERPETUAL'
-            and s.get('status') == 'TRADING'
+            and s.get('contractStatus') == 'TRADING'
             and s['symbol'].endswith('_PERP')
         ]
         # Priority order: BTC first, then majors, then rest alphabetically

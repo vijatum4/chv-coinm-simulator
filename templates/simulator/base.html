@@ -802,7 +802,8 @@ input[type=range].sf-range::-moz-range-track{
 
         <div class="sf-row">
           <label class="sf-field-label" id="capitalLabel">Capital ({{ base_asset }})</label>
-          <input class="sf-input mono" id="capitalInput" type="number" name="capital" value="{{ capital }}" min="0.0001" step="0.0001">
+          <input class="sf-input mono" id="capitalInput" type="number" name="capital" value="{{ capital }}" min="0.0001" step="0.0001" oninput="updateCapitalUsd()">
+          <div id="capitalUsdNote" style="font-size:10.5px;color:var(--muted);margin-top:-10px;margin-bottom:10px;line-height:1.4"></div>
         </div>
 
         <div class="sf-row-2">
@@ -1015,6 +1016,7 @@ function fetchPriceAtr() {
           updateFixedMarginPreview();
         } else {
           updateContractsNote();
+          updateCapitalUsd();
         }
       } else {
         statusEl.textContent = '✗ ' + (data.error || 'Failed');
@@ -1292,6 +1294,24 @@ function exportCsv(btn) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+function updateCapitalUsd() {
+  var note = document.getElementById('capitalUsdNote');
+  if (!note) return;
+  var cap = parseFloat(document.getElementById('capitalInput')?.value);
+  var price = parseFloat(document.getElementById('priceInput')?.value);
+  if (!cap || isNaN(cap) || !price || isNaN(price) || price <= 0) {
+    note.textContent = '';
+    return;
+  }
+  var usd = cap * price;
+  var fmt = usd >= 1000000
+    ? '$' + (usd / 1000000).toFixed(2) + 'M'
+    : usd >= 1000
+    ? '$' + (usd / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
+    : '$' + usd.toFixed(2);
+  note.textContent = '≈ ' + fmt + ' USD';
 }
 
 function updateContractsNote() {

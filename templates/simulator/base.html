@@ -666,13 +666,13 @@ input[type=range].sf-range::-moz-range-track{
             <button type="button" id="dualAtrModeMin" onclick="setDualAtrMode('min')"
                     style="padding:2px 9px;font-size:10px;font-weight:700;border:none;border-radius:20px;cursor:pointer;letter-spacing:0.04em;
                            background:{% if dual_atr_mode != 'max' %}var(--green){% else %}rgba(255,255,255,0.07){% endif %};
-                           color:{% if dual_atr_mode != 'max' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
+                           color:{% if dual_atr_mode != 'max' %}#fff{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
               MIN
             </button>
             <button type="button" id="dualAtrModeMax" onclick="setDualAtrMode('max')"
                     style="padding:2px 9px;font-size:10px;font-weight:700;border:none;border-radius:20px;cursor:pointer;letter-spacing:0.04em;
                            background:{% if dual_atr_mode == 'max' %}var(--gold){% else %}rgba(255,255,255,0.07){% endif %};
-                           color:{% if dual_atr_mode == 'max' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
+                           color:{% if dual_atr_mode == 'max' %}#fff{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
               MAX
             </button>
           </div>

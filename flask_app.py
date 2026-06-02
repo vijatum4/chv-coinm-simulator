@@ -834,7 +834,7 @@ def bt_result_view(job_id):
     # ── Severity thresholds ───────────────────────────────────────────────
     # Max Drawdown / Worst Cycle Loss: as % of starting capital
     drawdown_pct = (abs(max_drawdown_btc) / capital_btc * 100) if capital_btc else 0
-    worst_pct    = (abs(worst_intra_btc)  / capital_btc * 100) if capital_btc else 0
+    worst_pct    = (abs(worst_intra_btc) / cap_btc_at_worst * 100) if cap_btc_at_worst else 0
 
     # Max WS capacity: how many WS can starting capital theoretically fund?
     _face_val_cap = float(d_job.get('face_value',

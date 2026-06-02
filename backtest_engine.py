@@ -196,8 +196,10 @@ def simulate_cycle_on_candles(
                 fee  = lots * face_value * fee_rate
                 slip = lots * face_value * slippage_pct
                 total_fees += fee
-                # LONG SL loss = contracts × face_value × c / lp
-                loss = -(lots * face_value * c / lp) - fee - slip
+                # Gap-fill fallback: if candle opened below SP, fill at open (not SP)
+                sl_fill = min(candle.open, sp) if sl_mode == 'wick' else sp
+                actual_c = lp - sl_fill  # real exit distance (≥ c on gap)
+                loss = -(lots * face_value * actual_c / lp) - fee - slip
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:
@@ -256,8 +258,10 @@ def simulate_cycle_on_candles(
                 fee  = lots * face_value * fee_rate
                 slip = lots * face_value * slippage_pct
                 total_fees += fee
-                # SHORT SL loss = contracts × face_value × c / sp
-                loss = -(lots * face_value * c / sp) - fee - slip
+                # Gap-fill fallback: if candle opened above LP, fill at open (not LP)
+                sl_fill = max(candle.open, lp) if sl_mode == 'wick' else lp
+                actual_c = sl_fill - sp  # real exit distance (≥ c on gap)
+                loss = -(lots * face_value * actual_c / sp) - fee - slip
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:

@@ -330,13 +330,13 @@
 
   <div class="stat">
     <div class="stat-lbl">Max Drawdown</div>
-    <div class="stat-val mono neg">{{ max_drawdown_btc | btcfmt }} {{ currency_sym }}</div>
+    <div class="stat-val mono neg">{{ (max_drawdown_btc * -1) | btcfmt }} {{ currency_sym }}</div>
     <div class="stat-foot neg-foot">peak-to-trough · cycle {{ result.max_drawdown_cycle }}</div>
   </div>
 
   <div class="stat">
     <div class="stat-lbl">Total Fees Paid</div>
-    <div class="stat-val mono neg">{{ fees_btc | btcfmt }} {{ currency_sym }}</div>
+    <div class="stat-val mono neg">{{ (fees_btc * -1) | btcfmt }} {{ currency_sym }}</div>
     <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }} t</div>
   </div>
 

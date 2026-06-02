@@ -792,7 +792,7 @@ input[type=range].sf-range::-moz-range-track{
             <span class="sf-slider-badge" id="leverageBadge">{{ leverage }}×</span>
           </div>
           <input class="sf-range" type="range" id="leverageRange" name="leverage"
-                 min="1" max="125" step="1" value="{{ leverage }}"
+                 min="1" max="50" step="1" value="{{ leverage }}"
                  oninput="document.getElementById('leverageBadge').textContent=this.value+'×'; if(document.getElementById('fixedMarginCheck')?.checked) updateFixedMarginPreview()">
         </div>
 

@@ -294,7 +294,10 @@ def fetch_historical_ohlcv(
         if progress_callback:
             progress_callback(min(1.0, batch_num / total_batches))
 
-        if len(batch) < batch_size:
+        # Only stop when we've reached the end of the requested window.
+        # Do NOT break on a partial batch — symbols with trading gaps return
+        # fewer than batch_size candles for the first segment, then resume.
+        if current_start >= end_ms:
             break
 
     return all_klines, None

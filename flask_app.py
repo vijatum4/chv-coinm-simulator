@@ -206,7 +206,8 @@ def _save_to_session(d):
 
 # ── SVG Chart helpers ─────────────────────────────────────────────────────────
 def _build_bt_charts(result, capital_btc: float, pnl_btc_list: list,
-                     base_asset: str = 'BTC') -> dict:
+                     base_asset: str = 'BTC',
+                     ws_gold_thresh: int = 7, ws_red_thresh: int = 11) -> dict:
     """Build SVG path data for all backtest charts (values in base asset)."""
     cycles = result.cycles
     if not cycles:
@@ -302,7 +303,14 @@ def _build_bt_charts(result, capital_btc: float, pnl_btc_list: list,
         bx = round(x0 + i / n * (x1 - x0), 1)
         bh = round((w / ws_max_val) * 180, 1) if ws_max_val else 0
         by = 220 - bh
-        col = '#7A64EB' if w <= 2 else ('#39C3C4' if w <= 5 else '#E63946')
+        if w == 0:
+            col = '#7A64EB'  # WS0 stays Solana Purple
+        elif w >= ws_red_thresh:
+            col = '#E63946'
+        elif w >= ws_gold_thresh:
+            col = '#ffc72e'
+        else:
+            col = '#39C3C4'
         ws_bars_svg += f'<rect x="{bx}" y="{by}" width="{bar_w:.1f}" height="{bh}" fill="{col}" rx="2"/>'
 
     return dict(
@@ -449,7 +457,7 @@ def _prep_trade_log(result) -> list:
     return rows
 
 
-def _build_ws_breakdown(result) -> list:
+def _build_ws_breakdown(result, ws_gold_thresh: int = 7, ws_red_thresh: int = 11) -> list:
     """Build whipsaw breakdown rows for the template."""
     all_ws = [c.whipsaws for c in result.cycles]
     if not all_ws:
@@ -466,7 +474,18 @@ def _build_ws_breakdown(result) -> list:
         pct = cnt / total * 100
         cum_pct = cumulative / total * 100
         bar_w = (cnt / max_cnt * 100) if max_cnt else 0
-        color = 'pos' if n == 0 else ('warm' if n <= 5 else 'neg')
+        if n == 0:
+            color = 'pos'          # WS0 stays Solana Purple
+            hex_col = '#7A64EB'
+        elif n >= ws_red_thresh:
+            color = 'neg'
+            hex_col = '#E63946'
+        elif n >= ws_gold_thresh:
+            color = 'warm'
+            hex_col = '#ffc72e'
+        else:
+            color = 'safe'
+            hex_col = '#39C3C4'
         rows.append({
             'n': n,
             'cnt': cnt,
@@ -474,6 +493,7 @@ def _build_ws_breakdown(result) -> list:
             'cum': f'{cum_pct:.1f}%',
             'bar_w': round(bar_w, 1),
             'color': color,
+            'hex_col': hex_col,
         })
     return rows
 
@@ -830,7 +850,7 @@ def bt_result_view(job_id):
     )[:5]
     top6_ws = [(c.whipsaws, *_ws_peak_info(c)) for c in top_cycles]
     # top6_ws[i] = (ws_count, lots_str, peak_margin)
-    ws_breakdown = _build_ws_breakdown(result)
+    ws_breakdown = _build_ws_breakdown(result, ws_gold_thresh=ws_gold_thresh, ws_red_thresh=ws_red_thresh)
 
     # ── Severity thresholds ───────────────────────────────────────────────
     # Max Drawdown / Worst Cycle Loss: as % of starting capital
@@ -856,7 +876,8 @@ def bt_result_view(job_id):
                        d_job.get('trading_tf', '1h'),
                        reward_ratio=float(d_job.get('reward_ratio', 2.5)),
                        lot_dec=_lot_dec)
-    charts = _build_bt_charts(result, capital_btc, pnl_btc_list, base_asset)
+    charts = _build_bt_charts(result, capital_btc, pnl_btc_list, base_asset,
+                              ws_gold_thresh=ws_gold_thresh, ws_red_thresh=ws_red_thresh)
 
     return render_template('simulator/backtest.html',
                            bt_job_id=job_id,

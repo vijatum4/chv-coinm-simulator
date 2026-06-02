@@ -508,12 +508,12 @@
       <div class="h" style="text-align:right">%</div>
       <div class="h" style="text-align:right">Σ%</div>
       {% for row in ws_breakdown %}
-      <div class="wh-num {{ row.color }}">{{ row.n }}</div>
+      <div class="wh-num" style="color:{{ row.hex_col }}">{{ row.n }}</div>
       <div class="wh-bar-cell">
-        <div class="wh-bar {% if row.color != 'pos' %}{{ row.color }}{% endif %}" style="width:{{ row.bar_w }}%"></div>
+        <div class="wh-bar" style="width:{{ row.bar_w }}%;background:{{ row.hex_col }}"></div>
       </div>
-      <div class="wh-pct {{ row.color }}" style="font-weight:600">{{ row.cnt }}</div>
-      <div class="wh-pct {{ row.color }}">{{ row.pct }}</div>
+      <div class="wh-pct" style="color:{{ row.hex_col }};font-weight:600">{{ row.cnt }}</div>
+      <div class="wh-pct" style="color:{{ row.hex_col }}">{{ row.pct }}</div>
       <div class="wh-cum">{{ row.cum }}</div>
       {% endfor %}
     </div>

@@ -318,7 +318,7 @@
 </div>
 
 {# ── Row 1: P&L, Worst Loss, Fees ────────────────────────────────────── #}
-<div class="stat-grid stat-grid-3">
+<div class="stat-grid stat-grid-4">
 
   <div class="stat featured{% if total_pnl_btc < 0 %} neg-pnl{% endif %}">
     <div class="stat-lbl">Total Net P&amp;L</div>
@@ -332,6 +332,12 @@
     <div class="stat-lbl">Max Drawdown</div>
     <div class="stat-val mono neg">{{ (max_drawdown_btc * -1) | btcfmt }} {{ currency_sym }}</div>
     <div class="stat-foot neg-foot">peak-to-trough · cycle {{ result.max_drawdown_cycle }}</div>
+  </div>
+
+  <div class="stat">
+    <div class="stat-lbl">Worst Cycle Loss</div>
+    <div class="stat-val mono neg">{{ (worst_intra_btc * -1) | btcfmt }} {{ currency_sym }}</div>
+    <div class="stat-foot neg-foot">intra-cycle · cycle {{ result.worst_intra_loss_cycle }}</div>
   </div>
 
   <div class="stat">

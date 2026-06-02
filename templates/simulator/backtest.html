@@ -4,11 +4,11 @@
 {% block extra_css %}
 /* Negative P&L featured card */
 .stat.featured.neg-pnl {
-  background: oklch(0.66 0.18 28);
+  background: linear-gradient(155deg,#E63946 0%,#b02030 100%);
 }
-.stat.featured.neg-pnl .stat-lbl { color: oklch(0.25 0.08 28 / 0.65) }
-.stat.featured.neg-pnl .stat-val { color: oklch(0.20 0.07 28) }
-.stat.featured.neg-pnl .stat-foot { background: rgba(0,0,0,0.15); color: oklch(0.25 0.08 28) }
+.stat.featured.neg-pnl .stat-lbl { color: rgba(255,255,255,0.75) }
+.stat.featured.neg-pnl .stat-val { color: #fff }
+.stat.featured.neg-pnl .stat-foot { background: rgba(0,0,0,0.18); color: #fff }
 
 /* Whipsaw breakdown: N + Distribution + Count + % + Σ% */
 .wh-table { grid-template-columns: 28px 1fr 44px 60px 60px }
@@ -18,11 +18,11 @@
 
 /* Liquidation detail cards */
 .liq-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(136px,1fr)); gap:7px; margin-top:14px }
-.liq-card { background:rgba(0,0,0,0.22); border-radius:9px; padding:9px 11px }
+.liq-card { background:rgba(230,57,70,0.08); border:1px solid rgba(230,57,70,0.15); border-radius:9px; padding:9px 11px }
 .liq-lbl  { font-size:10px; text-transform:uppercase; letter-spacing:0.08em;
-             color:oklch(0.66 0.18 28 / 0.75); margin-bottom:3px }
+             color:var(--muted); margin-bottom:3px }
 .liq-val  { font-family:'JetBrains Mono',monospace; font-size:13px; font-weight:600;
-             color:oklch(0.92 0.05 28) }
+             color:var(--beige) }
 .liq-val.liq-bad { color:var(--neg) }
 {% endblock %}
 
@@ -170,7 +170,7 @@
         <div class="val"{% if fixed_margin_on %} style="opacity:0.45"{% endif %}>{{ base_lots }}{% if fixed_margin_on %}<span style="font-size:9px;margin-left:2px;opacity:0.7">≈</span>{% endif %}</div>
       </div>
       <div class="param"><div class="lbl">Leverage</div><div class="val">{{ leverage }}×</div></div>
-      <div class="param capital"><div class="lbl">Capital</div><div class="val">{{ '{:,.0f}'.format(bt_capital) }}</div></div>
+      <div class="param capital"><div class="lbl">Capital</div><div class="val">{{ capital_btc | coinfmt }} {{ currency_sym }}</div></div>
       {# ── Row 2: execution + guards ── #}
       <div class="param dim"><div class="lbl">Fee T/M</div><div class="val">{{ fee_rate_pct }}<span style="opacity:0.45">/</span>{{ maker_fee_pct }}%</div></div>
       <div class="param dim"><div class="lbl">Slippage</div><div class="val">{{ '%.2f'%(slip_pct*100) }}%</div></div>
@@ -212,7 +212,7 @@
       <strong style="font-size:14px">Account LIQUIDATED — Cycle {{ result.liquidation_cycle }}, Whipsaw #{{ result.liquidation_step }}</strong>
       <div style="font-size:12px;margin-top:3px;color:var(--neg);opacity:0.85">
         {% if liq_detail and liq_detail.reason == 'loss' %}
-        Cumulative whipsaw losses ({{ cur }}{{ '{:,.2f}'.format(liq_detail.cum_loss | abs) }}) exceeded available capital — the account went negative before the next inversion could be placed.
+        Cumulative whipsaw losses ({{ (liq_detail.cum_loss / conversion_price) | btcfmt }} {{ currency_sym }}) exceeded available capital — the account went negative before the next inversion could be placed.
         {% else %}
         The next inversion required more margin than available capital.
         {% endif %}
@@ -240,25 +240,25 @@
     </div>
     <div class="liq-card">
       <div class="liq-lbl">@ SL Price</div>
-      <div class="liq-val">{{ cur }}{{ '{:,.4f}'.format(liq_detail.sl_price) }}</div>
+      <div class="liq-val">${{ '{:,.2f}'.format(liq_detail.sl_price) }}</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Margin Needed</div>
-      <div class="liq-val{% if liq_detail.reason == 'margin' %} liq-bad{% endif %}">{{ cur }}{{ '{:,.2f}'.format(liq_detail.failed_margin) }}</div>
+      <div class="liq-val{% if liq_detail.reason == 'margin' %} liq-bad{% endif %}">{{ (liq_detail.failed_margin / conversion_price) | coinfmt }} {{ currency_sym }}</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Capital Available</div>
-      <div class="liq-val">{{ cur }}{{ '{:,.2f}'.format(liq_detail.cap_before) }}</div>
+      <div class="liq-val">{{ (liq_detail.cap_before / conversion_price) | coinfmt }} {{ currency_sym }}</div>
     </div>
     {% if liq_detail.reason == 'margin' %}
     <div class="liq-card">
       <div class="liq-lbl">Shortfall</div>
-      <div class="liq-val liq-bad">-{{ cur }}{{ '{:,.2f}'.format(liq_detail.shortfall) }}</div>
+      <div class="liq-val liq-bad">{{ (liq_detail.shortfall / conversion_price) | btcfmt }} {{ currency_sym }}</div>
     </div>
     {% else %}
     <div class="liq-card">
       <div class="liq-lbl">Loss vs Capital</div>
-      <div class="liq-val liq-bad">-{{ cur }}{{ '{:,.2f}'.format(liq_detail.net_remaining | abs) }} over</div>
+      <div class="liq-val liq-bad">{{ (liq_detail.net_remaining / conversion_price) | btcfmt }} {{ currency_sym }} over</div>
     </div>
     {% endif %}
   </div>
@@ -284,7 +284,7 @@
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Entry Price</div>
-      <div class="liq-val">{{ cur }}{{ '{:,.4f}'.format(mn_detail.entry_price) }}</div>
+      <div class="liq-val">${{ '{:,.2f}'.format(mn_detail.entry_price) }}</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">WS1 Inv Contracts</div>
@@ -292,7 +292,7 @@
     </div>
     <div class="liq-card">
       <div class="liq-lbl">WS1 Notional</div>
-      <div class="liq-val liq-bad">{{ cur }}{{ '{:,.4f}'.format(mn_detail.inv_notional) }}</div>
+      <div class="liq-val liq-bad">${{ '{:,.2f}'.format(mn_detail.inv_notional) }}</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Min Base Contracts</div>
@@ -320,25 +320,23 @@
 {# ── Row 1: P&L, Worst Loss, Fees ────────────────────────────────────── #}
 <div class="stat-grid stat-grid-3">
 
-  <div class="stat featured{% if result.total_net_pnl < 0 %} neg-pnl{% endif %}">
+  <div class="stat featured{% if total_pnl_btc < 0 %} neg-pnl{% endif %}">
     <div class="stat-lbl">Total Net P&amp;L</div>
-    <div class="stat-val mono">
-      {% if result.total_net_pnl >= 0 %}+{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl) }}{% else %}-{{ cur }}{{ '{:,.2f}'.format(result.total_net_pnl|abs) }}{% endif %}
-    </div>
+    <div class="stat-val mono">{{ total_pnl_btc | btcfmt }} {{ currency_sym }}</div>
     <div class="stat-foot">
-      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.1f'|format(growth_pct|abs) }}% on {{ cur }}{{ '{:,.0f}'.format(bt_capital) }}
+      {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.2f'|format(growth_pct|abs) }}% on {{ capital_btc | coinfmt }} {{ currency_sym }}
     </div>
   </div>
 
   <div class="stat">
     <div class="stat-lbl">Worst Cycle Loss</div>
-    <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.worst_intra_loss | abs) }}</div>
-    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cur }}{{ '{:,.0f}'.format(cap_at_worst) }}</div>
+    <div class="stat-val mono neg">{{ worst_intra_btc | btcfmt }} {{ currency_sym }}</div>
+    <div class="stat-foot neg-foot">cycle {{ result.worst_intra_loss_cycle }} · {{ cap_btc_at_worst | coinfmt }} {{ currency_sym }}</div>
   </div>
 
   <div class="stat">
     <div class="stat-lbl">Total Fees Paid</div>
-    <div class="stat-val mono neg">-{{ cur }}{{ '{:,.2f}'.format(result.total_fees | abs) }}</div>
+    <div class="stat-val mono neg">{{ fees_btc | btcfmt }} {{ currency_sym }}</div>
     <div class="stat-foot neg-foot">{{ fee_rate_pct }}% × {{ '{:,}'.format(total_trades) }} t</div>
   </div>
 
@@ -389,7 +387,7 @@
       <div class="card-meta" style="margin-top:3px">Balance after every filled order · {{ ch.ct_trades }} trades</div>
     </div>
     <div class="chart-legend" style="margin-bottom:0">
-      <span class="legend-dot gold">Capital ({{ cur }})</span>
+      <span class="legend-dot gold">Capital ({{ currency_sym }})</span>
     </div>
   </div>
   <svg class="chart" viewBox="0 0 750 260" preserveAspectRatio="none" overflow="visible">
@@ -430,7 +428,7 @@
       </div>
     </div>
     <div class="chart-legend">
-      <span class="legend-dot sky">Net P&amp;L ({{ cur }})</span>
+      <span class="legend-dot sky">Net P&amp;L ({{ currency_sym }})</span>
       <span class="legend-dot green">Break-even</span>
     </div>
     <svg class="chart" viewBox="0 0 750 295" preserveAspectRatio="none" overflow="visible">
@@ -513,7 +511,7 @@
         <div class="card-meta" style="margin-top:3px">Account balance after each cycle · {{ ch.cap_cycles }} cycles</div>
       </div>
       <div class="chart-legend" style="margin-bottom:0">
-        <span class="legend-dot gold">Capital ({{ cur }})</span>
+        <span class="legend-dot gold">Capital ({{ currency_sym }})</span>
       </div>
     </div>
     <svg class="chart" viewBox="0 0 750 260" preserveAspectRatio="none" overflow="visible">
@@ -580,7 +578,7 @@
 <div class="section-head" style="margin-top:28px">
   <h2>Cycle Log</h2>
   <div class="section-sub">
-    Starting capital <strong style="color:var(--beige)">{{ cur }}{{ '{:,.2f}'.format(bt_capital) }}</strong>
+    Starting capital <strong style="color:var(--beige)">{{ capital_btc | coinfmt }} {{ currency_sym }}</strong> <span style="color:var(--muted);font-size:11px">(≈ ${{ '{:,.0f}'.format(conversion_price) }} / {{ currency_sym }})</span>
     · {{ bt_log | length }} cycles
   </div>
 </div>
@@ -607,7 +605,7 @@
       data-rr="{{ reward_ratio }}"
       data-lots="{{ base_lots }}"
       data-lev="{{ leverage }}"
-      data-capital="{{ bt_capital | int }}"
+      data-capital="{{ capital_btc }}"
       data-days="{{ bt_days }}">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg>
       CSV

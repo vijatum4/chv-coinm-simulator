@@ -65,7 +65,6 @@ MAX_STEPS = 50
 # ── Template filters ─────────────────────────────────────────────────────────
 @app.template_filter('capfmt')
 def capfmt(v):
-    """Compact capital: 30000 → '30k', 1500 → '1.5k', 500 → '500'"""
     try:
         v = float(v)
     except (TypeError, ValueError):
@@ -74,6 +73,35 @@ def capfmt(v):
         k = v / 1000
         return f'{int(k)}k' if k == int(k) else f'{k:.1f}k'
     return f'{v:,.0f}'
+
+
+@app.template_filter('btcfmt')
+def btcfmt(v):
+    """Format base-asset P&L with sign and appropriate decimal places."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return '—'
+    sign = '+' if v >= 0 else ''
+    av = abs(v)
+    if av >= 1:       return f'{sign}{v:.4f}'
+    if av >= 0.001:   return f'{sign}{v:.5f}'
+    if av >= 0.00001: return f'{sign}{v:.7f}'
+    return f'{sign}{v:.8f}'
+
+
+@app.template_filter('coinfmt')
+def coinfmt(v):
+    """Format base-asset amount (no sign) with appropriate decimal places."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return '—'
+    av = abs(v)
+    if av >= 1:       return f'{v:.4f}'
+    if av >= 0.001:   return f'{v:.5f}'
+    if av >= 0.00001: return f'{v:.7f}'
+    return f'{v:.8f}'
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -90,7 +118,7 @@ def _sidebar_defaults():
         reward_ratio=2.5,
         base_lots=1.0,       # contracts (integer)
         leverage=10,
-        capital=1000.0,
+        capital=0.01,        # BTC (base asset)
         fee_rate_pct=0.05,   # taker
         maker_fee_pct=0.02,  # maker (TP limit orders)
         slippage_label='0.05% — Liquid pairs (BTC / ETH)',
@@ -143,7 +171,7 @@ def _parse_sidebar(form, sess):
 
     # Apply capital default when no explicit value was submitted
     if 'capital' not in form and 'capital' not in sess:
-        d['capital'] = 1000.0
+        d['capital'] = 0.01
 
     for key in ('ws_limit_on', 'atr_guard_on', 'use_live', 'dual_atr_on', 'min_notional_on', 'fixed_margin_on'):
         # When a form is submitted, absent checkbox = explicitly unchecked.
@@ -177,18 +205,27 @@ def _save_to_session(d):
 
 
 # ── SVG Chart helpers ─────────────────────────────────────────────────────────
-def _build_bt_charts(result, capital: float, cur_sym: str = '$') -> dict:
-    """Build SVG path data for all backtest charts."""
+def _build_bt_charts(result, capital_btc: float, pnl_btc_list: list,
+                     base_asset: str = 'BTC') -> dict:
+    """Build SVG path data for all backtest charts (values in base asset)."""
     cycles = result.cycles
     if not cycles:
         return {}
     n = len(cycles)
     x0, x1 = 40, 710
 
-    # ── Equity curve (cumulative capital after each cycle) ────────────────
-    eq_vals = [capital]
-    for c in cycles:
-        eq_vals.append(eq_vals[-1] + c.net_pnl)
+    def _lbl(v):
+        av = abs(v)
+        if av >= 1:       return f'{v:.3f}'
+        if av >= 0.001:   return f'{v:.4f}'
+        if av >= 0.00001: return f'{v:.6f}'
+        return f'{v:.8f}'
+
+    # ── Equity curve in BTC ───────────────────────────────────────────────
+    eq_vals = [capital_btc]
+    for i, c in enumerate(cycles):
+        pnl_btc = pnl_btc_list[i] if i < len(pnl_btc_list) else 0.0
+        eq_vals.append(eq_vals[-1] + pnl_btc)
     eq_min = min(eq_vals); eq_max = max(eq_vals)
     if eq_min == eq_max:
         eq_min -= 1; eq_max += 1
@@ -201,22 +238,15 @@ def _build_bt_charts(result, capital: float, cur_sym: str = '$') -> dict:
     eq_line = 'M ' + ' L '.join(f'{x},{y}' for x, y in eq_pts)
     eq_area = eq_line + f' L {eq_pts[-1][0]},240 L {eq_pts[0][0]},240 Z'
     eq_ep = eq_pts[-1]
-    eq_zero_y = py_eq(capital)
+    eq_zero_y = py_eq(capital_btc)
 
     def _y_lbls(ymin, ymax, steps=4, y_bot=240, y_top=40):
-        """Y-axis labels. y_bot = pixel y at value ymin, y_top = pixel y at value ymax."""
         rng = ymax - ymin or 1
         out = []
         for i in range(steps + 1):
             v = ymin + rng * i / steps
             yp = round(y_bot + ((v - ymin) / rng) * (y_top - y_bot), 1)
-            if abs(v) >= 1000:
-                lbl = f'{cur_sym}{v/1000:.1f}k'
-            elif abs(v) >= 10:
-                lbl = f'{cur_sym}{v:.0f}'
-            else:
-                lbl = f'{cur_sym}{v:.1f}'
-            out.append({'y': yp, 'label': lbl})
+            out.append({'y': yp, 'label': _lbl(v)})
         return out
 
     def _x_lbls(total, steps=5):
@@ -240,12 +270,16 @@ def _build_bt_charts(result, capital: float, cur_sym: str = '$') -> dict:
     cap_line = 'M ' + ' L '.join(f'{x},{y}' for x, y in cap_pts)
     cap_area = cap_line + f' L {cap_pts[-1][0]},220 L {cap_pts[0][0]},220 Z'
 
-    # ── Capital per trade (every step with pnl != 0) ─────────────────────
-    ct_vals = [capital]
-    for c in cycles:
-        for step in c.steps:
-            if step.pnl != 0:
-                ct_vals.append(ct_vals[-1] + step.pnl)
+    # ── Capital per trade in BTC (every step with pnl != 0) ─────────────
+    ct_vals = [capital_btc]
+    for i, c in enumerate(cycles):
+        pnl_btc = pnl_btc_list[i] if i < len(pnl_btc_list) else 0.0
+        n_steps = len([s for s in c.steps if s.pnl != 0])
+        if n_steps:
+            step_pnl_btc = pnl_btc / n_steps  # distribute BTC P&L across steps
+            for step in c.steps:
+                if step.pnl != 0:
+                    ct_vals.append(ct_vals[-1] + step_pnl_btc)
     m = len(ct_vals)
     ct_min = min(ct_vals); ct_max = max(ct_vals)
     if ct_min == ct_max:
@@ -268,7 +302,7 @@ def _build_bt_charts(result, capital: float, cur_sym: str = '$') -> dict:
         bx = round(x0 + i / n * (x1 - x0), 1)
         bh = round((w / ws_max_val) * 180, 1) if ws_max_val else 0
         by = 220 - bh
-        col = '#B5E000' if w <= 2 else ('#FADD56' if w <= 5 else 'oklch(0.66 0.18 28)')
+        col = '#7A64EB' if w <= 2 else ('#39C3C4' if w <= 5 else '#E63946')
         ws_bars_svg += f'<rect x="{bx}" y="{by}" width="{bar_w:.1f}" height="{bh}" fill="{col}" rx="2"/>'
 
     return dict(
@@ -304,19 +338,20 @@ _EXIT_DISPLAY = {
     'LIQ':        'Liquidated',
 }
 
-def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$',
+def _prep_bt_log(result, capital_btc: float, pnl_btc_list: list,
+                 trading_tf: str = '1h',
                  reward_ratio: float = 2.5, lot_dec: int = 3) -> list:
-    cap = capital
+    cap_btc = capital_btc
     rows = []
-    for c in result.cycles:
-        cap += c.net_pnl
+    for i, c in enumerate(result.cycles):
+        pnl_btc = pnl_btc_list[i] if i < len(pnl_btc_list) else 0.0
+        cap_btc += pnl_btc
         s_dt = datetime.datetime.utcfromtimestamp(c.start_ts / 1000).strftime('%Y-%m-%d %H:%M') if c.start_ts else '—'
         e_dt = datetime.datetime.utcfromtimestamp(c.end_ts / 1000).strftime('%Y-%m-%d %H:%M') if c.end_ts else '—'
         liq = not c.capital_ok
         aborted = c.exit_direction == 'ABORTED'
         exit_str = 'LIQ' if liq else ('ABORTED' if aborted else c.exit_direction)
         exit_display = _EXIT_DISPLAY.get(exit_str, exit_str.replace('_', ' '))
-        # TP price: LP+d for long, SP−d for short
         c_param = c.lp - c.sp
         d_param = reward_ratio * c_param
         if exit_str == 'EXIT_LONG':
@@ -325,13 +360,32 @@ def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$',
             tp_fmt = f'{c.sp - d_param:.4f}'
         else:
             tp_fmt = '—'
+
+        # BTC formatting
+        def _bfmt(v):
+            av = abs(v)
+            s = '+' if v >= 0 else ''
+            if av >= 1:       return f'{s}{v:.4f}'
+            if av >= 0.001:   return f'{s}{v:.5f}'
+            if av >= 0.00001: return f'{s}{v:.7f}'
+            return f'{s}{v:.8f}'
+
+        def _cfmt(v):
+            av = abs(v)
+            if av >= 1:       return f'{v:.4f}'
+            if av >= 0.001:   return f'{v:.5f}'
+            if av >= 0.00001: return f'{v:.7f}'
+            return f'{v:.8f}'
+
+        worst_btc = c.peak_intra_loss / c.entry_price
+
         rows.append({
             'num': c.cycle_num,
-            'capital': f'{cur_sym}{cap:,.2f}',
-            'pnl': c.net_pnl,
-            'pnl_fmt': (f'+{cur_sym}{c.net_pnl:,.2f}' if c.net_pnl >= 0 else f'-{cur_sym}{abs(c.net_pnl):,.2f}'),
-            'pnl_pos': c.net_pnl > 0,
-            'pnl_zero': c.net_pnl == 0,
+            'capital': _cfmt(cap_btc),
+            'pnl': pnl_btc,
+            'pnl_fmt': _bfmt(pnl_btc),
+            'pnl_pos': pnl_btc > 0,
+            'pnl_zero': pnl_btc == 0,
             'lots': f'{c.base_lots:.{lot_dec}f}',
             'entry': f'{c.entry_price:.4f}',
             'tp': tp_fmt,
@@ -341,9 +395,9 @@ def _prep_bt_log(result, capital: float, trading_tf: str, cur_sym: str = '$',
             'ws': c.whipsaws,
             'ws_color': 'pos' if c.whipsaws == 0 else ('warn' if c.whipsaws <= 5 else 'neg'),
             'dur': f'{c.duration_candles} candles',
-            'worst': (f'-{cur_sym}{abs(c.peak_intra_loss):,.2f}' if c.peak_intra_loss < 0 else f'{cur_sym}{c.peak_intra_loss:,.2f}'),
-            'worst_neg': c.peak_intra_loss < 0,
-            'worst_zero': c.peak_intra_loss == 0,
+            'worst': (_bfmt(worst_btc) if worst_btc != 0 else '0'),
+            'worst_neg': worst_btc < 0,
+            'worst_zero': worst_btc == 0,
             'exit': exit_str,
             'exit_display': exit_display,
             'exit_long': 'LONG' in exit_str,
@@ -454,6 +508,12 @@ def _bt_worker(job_id: str):
         trading_candles = klines_to_candles(trading_klines)
         atr_candles = klines_to_candles(atr_klines)
 
+        # Derive BTC → USD conversion price from first available candle at backtest start
+        start_candle_idx = int(d.get('atr_period', 5)) + 2
+        conversion_price = trading_candles[min(start_candle_idx, len(trading_candles) - 1)].close
+        capital_btc = float(d['capital'])    # user input is in base asset (BTC)
+        capital_usd = capital_btc * conversion_price
+
         upd(78, 'Running CHV CoinM backtest…')
         result = run_backtest(
             symbol=d['symbol'],
@@ -464,7 +524,7 @@ def _bt_worker(job_id: str):
             dual_atr_mode=d.get('dual_atr_mode', 'min'),
             base_lots=d['base_lots'],
             leverage=int(d['leverage']),
-            capital=d['capital'],
+            capital=capital_usd,
             fee_rate=d['fee_rate_pct'] / 100.0,
             fee_rate_maker=d.get('maker_fee_pct', 0.02) / 100.0,
             buffer=d['efficiency_buffer'],
@@ -485,7 +545,10 @@ def _bt_worker(job_id: str):
         with _JOBS_LOCK:
             _JOBS[job_id].update(
                 status='done', progress=100, msg='Done!',
-                result=result, error=None, bt_capital=d['capital'],
+                result=result, error=None,
+                bt_capital=capital_usd,          # USD, used by engine
+                bt_capital_btc=capital_btc,      # BTC input from user
+                conversion_price=conversion_price,
             )
     except Exception as ex:
         with _JOBS_LOCK:
@@ -612,14 +675,32 @@ def bt_result_view(job_id):
 
     result = job['result']
     d_job = job.get('d', {})
-    bt_cap = job.get('bt_capital', d_job.get('capital', 1000.0))
+    bt_cap = job.get('bt_capital', 700.0)                  # USD (engine used this)
+    capital_btc = job.get('bt_capital_btc', 0.01)          # BTC (user input)
+    conversion_price = job.get('conversion_price', 70000.0)  # BTC/USD at backtest start
 
     d = _parse_sidebar({}, session)
     d.update({k: v for k, v in d_job.items()
               if k not in ('base_asset', 'settle_coin', 'lot_min', 'lot_step', 'lot_dec')})
 
+    base_asset = coinm_base_asset(d_job.get('symbol', 'BTCUSD_PERP'))
+
+    # ── BTC P&L per cycle (each cycle's USD P&L ÷ its entry price) ───────
+    pnl_btc_list = [c.net_pnl / c.entry_price for c in result.cycles]
+    total_pnl_btc = sum(pnl_btc_list)
+    fees_btc = result.total_fees / conversion_price
+    worst_intra_btc = result.worst_intra_loss / conversion_price
+
+    # Running BTC capital for cap_at_worst
+    cap_btc_running = capital_btc
+    cap_btc_at_worst = capital_btc
+    for i, c in enumerate(result.cycles):
+        if c.cycle_num == result.worst_intra_loss_cycle:
+            cap_btc_at_worst = cap_btc_running
+        cap_btc_running += pnl_btc_list[i]
+
     total_trades = sum(len(c.steps) for c in result.cycles)
-    growth_pct = (result.total_net_pnl / bt_cap * 100) if bt_cap else 0
+    growth_pct = (total_pnl_btc / capital_btc * 100) if capital_btc else 0
     _leverage   = float(d.get('leverage', 10))
     _base_lots  = float(d.get('base_lots', 1.0))
     _lot_dec    = LOT_SPECS.get(d.get('symbol', ''), (1, 1, 0))[2]
@@ -709,20 +790,11 @@ def bt_result_view(job_id):
     # top6_ws[i] = (ws_count, lots_str, peak_margin)
     ws_breakdown = _build_ws_breakdown(result)
 
-    # capital at worst_intra_loss_cycle
-    cap_running = bt_cap
-    cap_at_worst = bt_cap
-    for c in result.cycles:
-        if c.cycle_num == result.worst_intra_loss_cycle:
-            cap_at_worst = cap_running
-        cap_running += c.net_pnl
-
-    cur_sym = '$'
-
-    log = _prep_bt_log(result, bt_cap, d_job.get('trading_tf', '1h'), cur_sym,
+    log = _prep_bt_log(result, capital_btc, pnl_btc_list,
+                       d_job.get('trading_tf', '1h'),
                        reward_ratio=float(d_job.get('reward_ratio', 2.5)),
                        lot_dec=_lot_dec)
-    charts = _build_bt_charts(result, bt_cap, cur_sym)
+    charts = _build_bt_charts(result, capital_btc, pnl_btc_list, base_asset)
 
     return render_template('simulator/backtest.html',
                            bt_job_id=job_id,
@@ -731,14 +803,20 @@ def bt_result_view(job_id):
                            bt_log=log,
                            bt_charts=charts,
                            bt_cap=bt_cap,
+                           capital_btc=capital_btc,
+                           conversion_price=conversion_price,
+                           total_pnl_btc=total_pnl_btc,
+                           fees_btc=fees_btc,
+                           worst_intra_btc=worst_intra_btc,
+                           cap_btc_at_worst=cap_btc_at_worst,
                            total_trades=total_trades,
                            growth_pct=growth_pct,
                            top6_ws=top6_ws,
                            ws_breakdown=ws_breakdown,
-                           cap_at_worst=cap_at_worst,
                            liq_detail=liq_detail,
                            mn_detail=mn_detail,
-                           currency_sym=cur_sym,
+                           currency_sym=base_asset,
+                           base_asset=base_asset,
                            **_ctx(d, 'backtest'))
 
 

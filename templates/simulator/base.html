@@ -1137,7 +1137,7 @@ function updateWSRisk(baseContracts, leverage, fv) {
   // WS scaling: WS0=base, WS1=base×0.5, WS2+=prev×1.5
   const levels = [];
   let lots = baseContracts;
-  for (let ws = 0; ws <= 8; ws++) {
+  for (let ws = 0; ws <= 25; ws++) {
     const m = lots * fv / leverage;
     const mAsset = hasPrice ? m / price : null;
     const danger = capitalUsd !== null && m > capitalUsd;

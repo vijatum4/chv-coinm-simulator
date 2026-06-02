@@ -672,10 +672,11 @@ def bt_result_view(job_id):
     # ── Min notional detail ────────────────────────────────────────────────
     mn_detail = None
     if result.min_notional_rejected:
-        step = LOT_SPECS.get(d.get('symbol', ''), (0.001, 0.001, 3))[1]
+        step = LOT_SPECS.get(d.get('symbol', ''), (1, 1, 0))[1]
         inv_lots_val = round(_base_lots * 0.5, 6)
         inv_lots_fmt = f'{inv_lots_val:.{_lot_dec}f}'
-        min_base = math.ceil((10.0 / result.min_notional_price) / step) * step
+        # CoinM: WS1 needs ≥ 1 contract → base must be ≥ 2 contracts
+        min_base = max(2, math.ceil(1.0 / max(inv_lots_val, 0.0001) / step) * step)
         min_base_fmt = f'{min_base:.{_lot_dec}f}'
         mn_detail = {
             'cycle':       result.min_notional_cycle,

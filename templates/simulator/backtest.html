@@ -317,8 +317,8 @@
   <div class="section-sub">{{ '{:,}'.format(total_cycles) }} cycles · {{ '{:,}'.format(total_trades) }} trades</div>
 </div>
 
-{# ── Row 1: P&L, Worst Loss, Fees ────────────────────────────────────── #}
-<div class="stat-grid stat-grid-4">
+{# ── Row 1: Total Net P&L · Total Equity ─────────────────────────────── #}
+<div class="stat-grid stat-grid-2">
 
   <div class="stat featured{% if total_pnl_btc < 0 %} neg-pnl{% endif %}">
     <div class="stat-lbl">Total Net P&amp;L</div>
@@ -327,6 +327,19 @@
       {% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.2f'|format(growth_pct|abs) }}% on {{ capital_btc | coinfmt }} {{ currency_sym }}
     </div>
   </div>
+
+  <div class="stat">
+    <div class="stat-lbl">Total Equity</div>
+    <div class="stat-val mono {% if total_equity_btc >= capital_btc %}pos{% else %}neg{% endif %}">{{ total_equity_btc | coinfmt }} {{ currency_sym }}</div>
+    <div class="stat-foot {% if total_equity_btc >= capital_btc %}{% else %}neg-foot{% endif %}">
+      from {{ capital_btc | coinfmt }} {{ currency_sym }}
+    </div>
+  </div>
+
+</div>
+
+{# ── Row 2: Max Drawdown · Worst Cycle Loss · Total Fees ─────────────── #}
+<div class="stat-grid stat-grid-3">
 
   {% set dd_col = '#E63946' if drawdown_pct > 20 else ('#ffc72e' if drawdown_pct > 5 else '#39C3C4') %}
   <div class="stat">
@@ -350,7 +363,7 @@
 
 </div>
 
-{# ── Row 2: Cycles, Win Rate, Avg WS, Max WS ─────────────────────────── #}
+{# ── Row 3: Cycles · Win Rate · Avg WS · Max WS ──────────────────────── #}
 <div class="stat-grid stat-grid-4">
 
   <div class="stat">

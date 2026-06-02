@@ -729,6 +729,7 @@ def bt_result_view(job_id):
     pnl_btc_list = [c.net_pnl / c.entry_price for c in result.cycles]
     total_pnl_btc = sum(pnl_btc_list)
     fees_btc = result.total_fees / conversion_price
+    total_equity_btc = capital_btc + total_pnl_btc
     worst_intra_btc = result.worst_intra_loss / conversion_price
     max_drawdown_btc = result.max_drawdown / conversion_price
 
@@ -869,6 +870,7 @@ def bt_result_view(job_id):
                            conversion_price=conversion_price,
                            total_pnl_btc=total_pnl_btc,
                            fees_btc=fees_btc,
+                           total_equity_btc=total_equity_btc,
                            worst_intra_btc=worst_intra_btc,
                            max_drawdown_btc=max_drawdown_btc,
                            drawdown_pct=round(drawdown_pct, 1),

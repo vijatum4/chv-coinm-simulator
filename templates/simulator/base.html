@@ -237,6 +237,7 @@ select.sf-input{cursor:pointer;-webkit-appearance:none;appearance:none;
 .stat-grid{
   display:grid;grid-template-rows:auto 1fr auto;gap:12px;margin-bottom:12px;
 }
+.stat-grid-2{grid-template-columns:repeat(2,1fr)}
 .stat-grid-3{grid-template-columns:repeat(3,1fr)}
 .stat-grid-4{grid-template-columns:repeat(4,1fr)}
 .stat-grid:last-of-type{margin-bottom:20px}
@@ -490,6 +491,7 @@ svg.chart{width:100%;display:block}
 
 /* ── Responsive ─────────────────────────────────────────── */
 @media(max-width:1100px){
+  .stat-grid-2{grid-template-columns:repeat(2,1fr)}
   .stat-grid-3,.stat-grid-4{grid-template-columns:repeat(3,1fr)}
   .split{grid-template-columns:1fr}
   .params{grid-template-columns:repeat(5,1fr)}

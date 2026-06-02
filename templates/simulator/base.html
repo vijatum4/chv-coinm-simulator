@@ -831,13 +831,13 @@ input[type=range].sf-range::-moz-range-track{
             <button type="button" id="slModeWick" onclick="setSlMode('wick')"
                     style="padding:2px 9px;font-size:10px;font-weight:700;border:none;border-radius:20px;cursor:pointer;letter-spacing:0.04em;
                            background:{% if sl_mode != 'close' %}var(--green){% else %}rgba(255,255,255,0.07){% endif %};
-                           color:{% if sl_mode != 'close' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
+                           color:{% if sl_mode != 'close' %}#fff{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
               WICK
             </button>
             <button type="button" id="slModeClose" onclick="setSlMode('close')"
                     style="padding:2px 9px;font-size:10px;font-weight:700;border:none;border-radius:20px;cursor:pointer;letter-spacing:0.04em;
                            background:{% if sl_mode == 'close' %}var(--gold){% else %}rgba(255,255,255,0.07){% endif %};
-                           color:{% if sl_mode == 'close' %}#000{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
+                           color:{% if sl_mode == 'close' %}#fff{% else %}var(--muted){% endif %};transition:background 0.15s,color 0.15s">
               CLOSE
             </button>
           </div>
@@ -942,14 +942,14 @@ function setFetchMode(mode) {
   if (liveBtn && periodBtn) {
     if (mode === 'live') {
       liveBtn.style.background   = 'var(--green)';
-      liveBtn.style.color        = '#000';
+      liveBtn.style.color        = '#fff';
       liveBtn.style.fontWeight   = '600';
       periodBtn.style.background = 'var(--card-2)';
       periodBtn.style.color      = 'var(--muted)';
       periodBtn.style.fontWeight = '500';
     } else {
       periodBtn.style.background = 'var(--gold)';
-      periodBtn.style.color      = '#000';
+      periodBtn.style.color      = '#fff';
       periodBtn.style.fontWeight = '600';
       liveBtn.style.background   = 'var(--card-2)';
       liveBtn.style.color        = 'var(--muted)';
@@ -1046,10 +1046,10 @@ function setSlMode(mode) {
   if (input) input.value = mode;
   if (wickBtn && closeBtn) {
     if (mode === 'wick') {
-      wickBtn.style.background  = 'var(--green)'; wickBtn.style.color  = '#000'; wickBtn.style.fontWeight  = '700';
+      wickBtn.style.background  = 'var(--green)'; wickBtn.style.color  = '#fff'; wickBtn.style.fontWeight  = '700';
       closeBtn.style.background = 'rgba(255,255,255,0.07)'; closeBtn.style.color = 'var(--muted)'; closeBtn.style.fontWeight = '700';
     } else {
-      closeBtn.style.background = 'var(--gold)';  closeBtn.style.color = '#000'; closeBtn.style.fontWeight = '700';
+      closeBtn.style.background = 'var(--gold)';  closeBtn.style.color = '#fff'; closeBtn.style.fontWeight = '700';
       wickBtn.style.background  = 'rgba(255,255,255,0.07)'; wickBtn.style.color  = 'var(--muted)'; wickBtn.style.fontWeight = '700';
     }
   }
@@ -1062,10 +1062,10 @@ function setDualAtrMode(mode) {
   if (input) input.value = mode;
   if (minBtn && maxBtn) {
     if (mode === 'min') {
-      minBtn.style.background = 'var(--green)';           minBtn.style.color = '#000';          minBtn.style.fontWeight = '700';
+      minBtn.style.background = 'var(--green)';           minBtn.style.color = '#fff';          minBtn.style.fontWeight = '700';
       maxBtn.style.background = 'rgba(255,255,255,0.07)'; maxBtn.style.color = 'var(--muted)';  maxBtn.style.fontWeight = '700';
     } else {
-      maxBtn.style.background = 'var(--gold)';            maxBtn.style.color = '#000';           maxBtn.style.fontWeight = '700';
+      maxBtn.style.background = 'var(--gold)';            maxBtn.style.color = '#fff';           maxBtn.style.fontWeight = '700';
       minBtn.style.background = 'rgba(255,255,255,0.07)'; minBtn.style.color = 'var(--muted)';   minBtn.style.fontWeight = '700';
     }
   }

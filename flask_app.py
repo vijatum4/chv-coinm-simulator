@@ -1,6 +1,6 @@
-"""CHV Recovery Trade Simulator — Flask App.
+"""CHV CoinM Simulator — Flask App.
 
-Runs on port 8503. Olive dark theme.
+Runs on port 8507. Teal dark theme.
 """
 from __future__ import annotations
 import io, json, os, pathlib, sys, math, datetime, threading, uuid, csv
@@ -975,4 +975,4 @@ def service_worker():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8503, debug=False, threaded=True)
+    app.run(host='0.0.0.0', port=8507, debug=False, threaded=True)

@@ -389,7 +389,7 @@ def _prep_bt_log(result, capital_btc: float, pnl_btc_list: list,
             if av >= 0.00001: return f'{v:.7f}'
             return f'{v:.8f}'
 
-        worst_btc = c.peak_intra_loss / c.entry_price
+        worst_btc = c.peak_intra_loss   # engine outputs in base coin directly
 
         rows.append({
             'num': c.cycle_num,
@@ -751,10 +751,10 @@ def bt_result_view(job_id):
 
     base_asset = coinm_base_asset(d_job.get('symbol', 'BTCUSD_PERP'))
 
-    # ── BTC P&L per cycle (each cycle's USD P&L ÷ its entry price) ───────
-    pnl_btc_list = [c.net_pnl / c.entry_price for c in result.cycles]
+    # ── P&L per cycle — engine now outputs directly in base coin ─────────
+    pnl_btc_list = [c.net_pnl for c in result.cycles]
     total_pnl_btc = sum(pnl_btc_list)
-    fees_btc = result.total_fees / conversion_price
+    fees_btc = result.total_fees   # engine total_fees also in base coin
     total_equity_btc = capital_btc + total_pnl_btc
     worst_intra_btc = result.worst_intra_loss / conversion_price
     max_drawdown_btc = result.max_drawdown / conversion_price

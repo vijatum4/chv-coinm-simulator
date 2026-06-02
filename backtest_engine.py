@@ -157,9 +157,9 @@ def simulate_cycle_on_candles(
     if (lots * face_value) / leverage > capital:
         return steps, start_idx, 0.0, False, 0.0, 0, 0.0
 
-    # Open entry position — fee on notional (no price dependency)
-    entry_fee  = lots * face_value * fee_rate
-    entry_slip = lots * face_value * slippage_pct
+    # Open entry position — fee in base coin = notional_USD × rate / fill_price
+    entry_fee  = lots * face_value * fee_rate / initial_price
+    entry_slip = lots * face_value * slippage_pct / initial_price
     total_fees += entry_fee
     balance    -= (entry_fee + entry_slip)
     steps.append(CycleStep(
@@ -177,11 +177,11 @@ def simulate_cycle_on_candles(
         if direction == "LONG":
             # TP at TL — limit order (maker fee)
             if candle.high >= tl:
-                fee  = lots * face_value * fee_rate_maker
-                slip = lots * face_value * slippage_pct
+                fee  = lots * face_value * fee_rate_maker / tl
+                slip = lots * face_value * slippage_pct / tl
                 total_fees += fee
-                # LONG TP P&L = contracts × face_value × d / lp
-                exit_pnl = (lots * face_value * d / lp) - fee - slip
+                # LONG TP: contracts × face_value × d / (LP × TL)  [exact CoinM formula]
+                exit_pnl = (lots * face_value * d / (lp * tl)) - fee - slip
                 balance += exit_pnl
                 steps.append(CycleStep(
                     direction="EXIT_LONG", trigger_price=tl, lots=0,
@@ -193,14 +193,13 @@ def simulate_cycle_on_candles(
             # SL at SP
             sl_trigger = candle.close <= sp if sl_mode == 'close' else candle.low <= sp
             if sl_trigger:
-                fee  = lots * face_value * fee_rate
-                slip = lots * face_value * slippage_pct
-                total_fees += fee
-                # Wick: gap-open fills at candle.open if already past SP, else fills at SP
-                # Close: exits at actual close price (always ≤ sp by trigger condition)
                 sl_fill = min(candle.open, sp) if sl_mode == 'wick' else candle.close
                 actual_c = lp - sl_fill  # real exit distance (≥ c on gap or deep close)
-                loss = -(lots * face_value * actual_c / lp) - fee - slip
+                fee  = lots * face_value * fee_rate / sl_fill
+                slip = lots * face_value * slippage_pct / sl_fill
+                total_fees += fee
+                # LONG SL: contracts × face_value × c / (LP × sl_fill)  [exact CoinM formula]
+                loss = -(lots * face_value * actual_c / (lp * sl_fill)) - fee - slip
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:
@@ -213,9 +212,9 @@ def simulate_cycle_on_candles(
                 if margin_needed > capital or abs(balance) > capital:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
 
-                # Open new SHORT at SP
-                open_fee  = next_lots * face_value * fee_rate
-                open_slip = next_lots * face_value * slippage_pct
+                # Open new SHORT at sl_fill — fee in base coin
+                open_fee  = next_lots * face_value * fee_rate / sl_fill
+                open_slip = next_lots * face_value * slippage_pct / sl_fill
                 total_fees += open_fee
                 balance    -= (open_fee + open_slip)
                 if balance < peak_intra_loss:
@@ -240,11 +239,11 @@ def simulate_cycle_on_candles(
         else:  # SHORT
             # TP at TS — limit order (maker fee)
             if candle.low <= ts_level:
-                fee  = lots * face_value * fee_rate_maker
-                slip = lots * face_value * slippage_pct
+                fee  = lots * face_value * fee_rate_maker / ts_level
+                slip = lots * face_value * slippage_pct / ts_level
                 total_fees += fee
-                # SHORT TP P&L = contracts × face_value × d / sp
-                exit_pnl = (lots * face_value * d / sp) - fee - slip
+                # SHORT TP: contracts × face_value × d / (SP × TS)  [exact CoinM formula]
+                exit_pnl = (lots * face_value * d / (sp * ts_level)) - fee - slip
                 balance += exit_pnl
                 steps.append(CycleStep(
                     direction="EXIT_SHORT", trigger_price=ts_level, lots=0,
@@ -256,14 +255,13 @@ def simulate_cycle_on_candles(
             # SL at LP
             sl_trigger = candle.close >= lp if sl_mode == 'close' else candle.high >= lp
             if sl_trigger:
-                fee  = lots * face_value * fee_rate
-                slip = lots * face_value * slippage_pct
-                total_fees += fee
-                # Wick: gap-open fills at candle.open if already past LP, else fills at LP
-                # Close: exits at actual close price (always ≥ lp by trigger condition)
                 sl_fill = max(candle.open, lp) if sl_mode == 'wick' else candle.close
                 actual_c = sl_fill - sp  # real exit distance (≥ c on gap or high close)
-                loss = -(lots * face_value * actual_c / sp) - fee - slip
+                fee  = lots * face_value * fee_rate / sl_fill
+                slip = lots * face_value * slippage_pct / sl_fill
+                total_fees += fee
+                # SHORT SL: contracts × face_value × c / (SP × sl_fill)  [exact CoinM formula]
+                loss = -(lots * face_value * actual_c / (sp * sl_fill)) - fee - slip
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:
@@ -275,9 +273,9 @@ def simulate_cycle_on_candles(
                 if margin_needed > capital or abs(balance) > capital:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
 
-                # Open new LONG at LP
-                open_fee  = next_lots * face_value * fee_rate
-                open_slip = next_lots * face_value * slippage_pct
+                # Open new LONG at sl_fill — fee in base coin
+                open_fee  = next_lots * face_value * fee_rate / sl_fill
+                open_slip = next_lots * face_value * slippage_pct / sl_fill
                 total_fees += open_fee
                 balance    -= (open_fee + open_slip)
                 if balance < peak_intra_loss:

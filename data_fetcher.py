@@ -148,8 +148,6 @@ def fetch_price_and_atr_as_of(
     ms_per_day = 86_400_000
     midnight_ms = (as_of_ts // ms_per_day) * ms_per_day
 
-    need = max(atr_period, atr_period_2 if atr_period_2 > 0 else 0) + 2
-
     if is_coinm:
         urls = ["https://dapi.binance.com/dapi/v1/klines"]
     else:
@@ -158,32 +156,27 @@ def fetch_price_and_atr_as_of(
             "https://api.binance.com/api/v3/klines",
         ]
 
-    klines = None
-    for url in urls:
-        try:
-            r = requests.get(url, params={
-                "symbol": symbol, "interval": interval,
-                "startTime": midnight_ms,
-                "limit": need,
-            }, timeout=6)
-            data = r.json()
-            if isinstance(data, list) and len(data) >= 2:
-                klines = data
-                break
-        except Exception:
-            continue
-
-    if klines is None:
-        return None, None, f"Could not fetch historical candles for {symbol}", None
-
-    # Price = close of the FIRST candle (midnight open → first close).
-    # Using klines[0] ensures price is identical regardless of how many
-    # candles were fetched (which varies by ATR period / dual mode).
-    price = float(klines[0][4])
+    def _fetch_klines(n):
+        """Fetch exactly n candles from midnight_ms using endTime to prevent
+        Binance returning wrong candles when startTime is ignored (e.g. for
+        delisted symbols that return their last available data instead)."""
+        end_ms = midnight_ms + n * interval_ms
+        for url in urls:
+            try:
+                r = requests.get(url, params={
+                    "symbol": symbol, "interval": interval,
+                    "startTime": midnight_ms,
+                    "endTime": end_ms,
+                    "limit": n,
+                }, timeout=6)
+                data = r.json()
+                if isinstance(data, list) and len(data) >= 2:
+                    return data
+            except Exception:
+                continue
+        return None
 
     def _calc_atr(candles, period):
-        # Use the FIRST `period` TRs so ATR[5] always covers the same
-        # candles (hours 0–5) whether fetched alone or in dual mode.
         trs = []
         for i in range(1, min(period + 1, len(candles))):
             high       = float(candles[i][2])
@@ -195,11 +188,24 @@ def fetch_price_and_atr_as_of(
             return None
         return round(statistics.mean(trs), 6)
 
-    atr1 = _calc_atr(klines, atr_period)
+    # Fetch ATR1 and price using only atr_period+2 candles — keeps price and
+    # ATR1 identical whether or not dual mode is active.
+    klines1 = _fetch_klines(atr_period + 2)
+    if klines1 is None:
+        return None, None, f"Could not fetch historical candles for {symbol}", None
+
+    price = float(klines1[0][4])
+    atr1  = _calc_atr(klines1, atr_period)
     if atr1 is None:
         return price, None, "Not enough historical candles to compute ATR.", None
 
-    atr2 = _calc_atr(klines, atr_period_2) if atr_period_2 > 0 else None
+    # Fetch ATR2 separately so its limit doesn't affect the price/ATR1 fetch.
+    atr2 = None
+    if atr_period_2 > 0:
+        klines2 = _fetch_klines(atr_period_2 + 2)
+        if klines2:
+            atr2 = _calc_atr(klines2, atr_period_2)
+
     return price, atr1, None, atr2
 
 

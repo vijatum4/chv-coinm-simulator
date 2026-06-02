@@ -302,6 +302,8 @@ def _build_bt_charts(result, capital_btc: float, pnl_btc_list: list,
     for i, w in enumerate(ws_vals):
         bx = round(x0 + i / n * (x1 - x0), 1)
         bh = round((w / ws_max_val) * 180, 1) if ws_max_val else 0
+        if w == 0:
+            bh = 3  # always show a small visible bar for WS=0
         by = 220 - bh
         if w == 0:
             col = '#7A64EB'  # WS0 stays Solana Purple

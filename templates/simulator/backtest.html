@@ -571,9 +571,10 @@
         <div class="card-meta" style="margin-top:3px">Distribution across {{ total_cycles }} cycles</div>
       </div>
       <div style="display:flex;gap:10px;font-size:11px">
-        <span style="color:var(--green)">● 0–2</span>
-        <span style="color:var(--gold)">● 3–5</span>
-        <span style="color:var(--neg)">● 6+</span>
+        <span style="color:#7A64EB">● 0</span>
+        <span style="color:#39C3C4">● 1–{{ ws_gold_thresh - 1 }}</span>
+        <span style="color:#ffc72e">● {{ ws_gold_thresh }}–{{ ws_red_thresh - 1 }}</span>
+        <span style="color:#E63946">● {{ ws_red_thresh }}+</span>
       </div>
     </div>
     <svg class="chart" viewBox="0 0 750 260" preserveAspectRatio="none" overflow="visible">

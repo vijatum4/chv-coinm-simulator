@@ -488,6 +488,8 @@ def _build_ws_breakdown(result, ws_gold_thresh: int = 7, ws_red_thresh: int = 11
         else:
             color = 'safe'
             hex_col = '#39C3C4'
+        if cnt == 0:
+            continue
         rows.append({
             'n': n,
             'cnt': cnt,

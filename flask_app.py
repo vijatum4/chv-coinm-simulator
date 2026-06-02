@@ -850,14 +850,10 @@ def bt_result_view(job_id):
     )[:5]
     top6_ws = [(c.whipsaws, *_ws_peak_info(c)) for c in top_cycles]
     # top6_ws[i] = (ws_count, lots_str, peak_margin)
-    ws_breakdown = _build_ws_breakdown(result, ws_gold_thresh=ws_gold_thresh, ws_red_thresh=ws_red_thresh)
-
     # ── Severity thresholds ───────────────────────────────────────────────
-    # Max Drawdown / Worst Cycle Loss: as % of starting capital
     drawdown_pct = (abs(max_drawdown_btc) / capital_btc * 100) if capital_btc else 0
     worst_pct    = (abs(worst_intra_btc) / cap_btc_at_worst * 100) if cap_btc_at_worst else 0
 
-    # Max WS capacity: how many WS can starting capital theoretically fund?
     _face_val_cap = float(d_job.get('face_value',
                           coinm_contract_size(d_job.get('symbol', 'BTCUSD_PERP'))))
     _base_l = float(d_job.get('base_lots', 1))
@@ -870,6 +866,8 @@ def bt_result_view(job_id):
         _inv = math.floor(_inv * 1.5)
     ws_red_thresh  = math.floor(_max_theo_ws * 0.85)
     ws_gold_thresh = math.floor(_max_theo_ws * 0.50)
+
+    ws_breakdown = _build_ws_breakdown(result, ws_gold_thresh=ws_gold_thresh, ws_red_thresh=ws_red_thresh)
 
     trade_log = _prep_trade_log(result)
     log = _prep_bt_log(result, capital_btc, pnl_btc_list,

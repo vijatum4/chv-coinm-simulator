@@ -409,6 +409,46 @@ def _prep_bt_log(result, capital_btc: float, pnl_btc_list: list,
     return rows
 
 
+def _prep_trade_log(result) -> list:
+    """Per-step trade history across all cycles. P&L in USD (template converts to asset)."""
+    _ACTION = {
+        'EXIT_LONG':  'TP Long',
+        'EXIT_SHORT': 'TP Short',
+        'STOPPED':    'Stopped',
+    }
+    rows = []
+    trade_num = 0
+    for cycle in result.cycles:
+        for i, step in enumerate(cycle.steps):
+            trade_num += 1
+            # Action label
+            if step.direction in _ACTION:
+                action = _ACTION[step.direction]
+                side_cls = 'long' if 'LONG' in step.direction else 'short'
+            elif i == 0:
+                action = f'Open {"Long" if step.direction == "LONG" else "Short"}'
+                side_cls = step.direction.lower()
+            else:
+                action = f'→ {"Long" if step.direction == "LONG" else "Short"}'
+                side_cls = step.direction.lower()
+
+            ts = datetime.datetime.utcfromtimestamp(
+                step.timestamp / 1000).strftime('%m-%d %H:%M') if step.timestamp else '—'
+
+            rows.append({
+                'num':      trade_num,
+                'cycle':    cycle.cycle_num,
+                'action':   action,
+                'side_cls': side_cls,   # long | short
+                'price':    f'{step.trigger_price:.4f}',
+                'lots':     int(step.lots) if step.lots else '—',
+                'pnl_usd':  step.pnl,   # USD — template converts ÷ entry_price
+                'entry_price': cycle.entry_price,
+                'ts':       ts,
+            })
+    return rows
+
+
 def _build_ws_breakdown(result) -> list:
     """Build whipsaw breakdown rows for the template."""
     all_ws = [c.whipsaws for c in result.cycles]
@@ -791,6 +831,7 @@ def bt_result_view(job_id):
     # top6_ws[i] = (ws_count, lots_str, peak_margin)
     ws_breakdown = _build_ws_breakdown(result)
 
+    trade_log = _prep_trade_log(result)
     log = _prep_bt_log(result, capital_btc, pnl_btc_list,
                        d_job.get('trading_tf', '1h'),
                        reward_ratio=float(d_job.get('reward_ratio', 2.5)),
@@ -802,6 +843,7 @@ def bt_result_view(job_id):
                            bt_error=None,
                            result=result,
                            bt_log=log,
+                           trade_log=trade_log,
                            bt_charts=charts,
                            bt_cap=bt_cap,
                            capital_btc=capital_btc,

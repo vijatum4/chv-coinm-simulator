@@ -664,6 +664,51 @@
   </div>
 </div>
 
+{# ── Trade History ───────────────────────────────────────────────────── #}
+{% if trade_log %}
+<div class="section-head" style="margin-top:28px">
+  <h2>Trade History</h2>
+  <div class="section-sub">{{ '{:,}'.format(trade_log|length) }} fills across {{ total_cycles }} cycles</div>
+</div>
+<div class="card" style="padding:0;overflow:hidden">
+  <div class="log-scroll" style="max-height:480px">
+    <table class="log-table" style="min-width:700px">
+      <thead>
+        <tr>
+          <th style="width:40px">#</th>
+          <th style="width:52px">Cycle</th>
+          <th>Action</th>
+          <th class="num">Price ($)</th>
+          <th class="num">Contracts</th>
+          <th class="num">P&amp;L ({{ currency_sym }})</th>
+          <th>Time (UTC)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in trade_log %}
+        {% set pnl_asset = t.pnl_usd / t.entry_price if t.entry_price else 0 %}
+        <tr>
+          <td class="col-num">{{ t.num }}</td>
+          <td class="col-num" style="color:var(--beige-dim)">{{ t.cycle }}</td>
+          <td>
+            <span class="pill {{ t.side_cls if t.side_cls in ('long','short') else 'stopped' }}">
+              {{ t.action }}
+            </span>
+          </td>
+          <td class="num">{{ t.price }}</td>
+          <td class="num" style="color:var(--beige-dim)">{{ t.lots }}</td>
+          <td class="num {% if pnl_asset > 0 %}pl-pos{% elif pnl_asset < 0 %}pl-neg{% endif %}">
+            {{ pnl_asset | btcfmt }}
+          </td>
+          <td style="color:var(--beige-dim)">{{ t.ts }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
 {% else %}
 {# ── No result yet ────────────────────────────────────────────────────── #}
 {% if not bt_job_id %}

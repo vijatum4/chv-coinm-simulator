@@ -168,7 +168,10 @@ def simulate_cycle_on_candles(
         timestamp=candles[start_idx].timestamp,
     ))
 
-    for idx in range(start_idx, len(candles)):
+    # Start from start_idx + 1: LP = candle[start_idx].close, so that candle's
+    # high/low happened BEFORE the close. Orders are placed after close; the
+    # first candle eligible for TP/SL is the next one.
+    for idx in range(start_idx + 1, len(candles)):
         candle = candles[idx]
 
         if direction == "LONG":

@@ -622,7 +622,7 @@ def bt_result_view(job_id):
     growth_pct = (result.total_net_pnl / bt_cap * 100) if bt_cap else 0
     _leverage   = float(d.get('leverage', 10))
     _base_lots  = float(d.get('base_lots', 1.0))
-    _lot_dec    = LOT_SPECS.get(d.get('symbol', ''), (0.001, 0.001, 3))[2]
+    _lot_dec    = LOT_SPECS.get(d.get('symbol', ''), (1, 1, 0))[2]
 
     # ── Liquidation detail ─────────────────────────────────────────────────
     liq_detail = None
@@ -688,11 +688,14 @@ def bt_result_view(job_id):
             'completed':   result.total_cycles,
         }
 
+    _face_val_ws = float(d.get('face_value', coinm_contract_size(d.get('symbol', 'BTCUSD_PERP'))))
+
     def _ws_peak_info(cycle):
         N = cycle.whipsaws
-        cb = cycle.base_lots   # actual lots for this cycle (varies in fixed-margin mode)
+        cb = cycle.base_lots
         lots = cb if N == 0 else cb * 0.5 * (1.5 ** max(N - 1, 0))
-        margin = lots * float(cycle.entry_price) / _leverage
+        # CoinM: margin = contracts × face_value / leverage (price-independent)
+        margin = lots * _face_val_ws / _leverage
         lots_fmt = f'{lots:.{_lot_dec}f}'
         return lots_fmt, margin
 

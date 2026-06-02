@@ -913,7 +913,9 @@ function _faceValue() {
 
 function updateAssetLabels(symbolVal) {
   const base = (symbolVal || '').replace('USD_PERP','').replace('USDT','').replace('BUSD','');
-  const lotsLbl = document.getElementById('baseLotsLabel');
+  const lotsLbl    = document.getElementById('baseLotsLabel');
+  const capitalLbl = document.getElementById('capitalLabel');
+  if (capitalLbl) capitalLbl.textContent = `Capital (${base})`;
   if (!lotsLbl) return;
   const isFixed = document.getElementById('fixedMarginCheck')?.checked;
   if (isFixed) updateFixedMarginPreview();

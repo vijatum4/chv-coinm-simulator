@@ -324,7 +324,7 @@
     <div class="stat-lbl">Total Net P&amp;L</div>
     <div class="stat-val mono">{{ total_pnl_btc | btcfmt }} {{ currency_sym }}</div>
     <div class="stat-foot">
-      <span style="color:#39C3C4">{% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.2f'|format(growth_pct|abs) }}%</span> on {{ capital_btc | coinfmt }} {{ currency_sym }}
+      <span style="color:{% if growth_pct >= 0 %}#39C3C4{% else %}#000{% endif %}">{% if growth_pct >= 0 %}↑{% else %}↓{% endif %} {{ '%.2f'|format(growth_pct|abs) }}%</span> on {{ capital_btc | coinfmt }} {{ currency_sym }}
     </div>
   </div>
 

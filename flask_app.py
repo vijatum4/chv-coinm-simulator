@@ -16,7 +16,7 @@ from chv_engine import calculate_params, simulate, optimize, generate_bot_config
 from backtest_engine import run_backtest
 from data_fetcher import (fetch_historical_ohlcv, klines_to_candles,
                           fetch_price_and_atr, fetch_price_and_atr_as_of,
-                          get_available_symbols)
+                          get_coinm_symbols, coinm_contract_size, coinm_base_asset)
 
 app = Flask(__name__, template_folder=str(SIM_DIR / 'templates'),
             static_folder=str(SIM_DIR / 'static'))
@@ -49,28 +49,25 @@ TF_RULE = {
     '6h': '1d', '8h': '1d', '12h': '3d', '1d': '1w',
 }
 
-# Per-symbol lot specs (min_qty, step, decimals) — matches Streamlit _LOT_SPECS
+# CoinM contract specs: (min_contracts, step, decimals)
+# All CoinM symbols use integer contracts (step=1), face_value from coinm_contract_size()
 LOT_SPECS = {
-    'AVAXUSDT':     (1.0,   1.0,   0),
-    'BNBUSDT':      (0.01,  0.01,  2),
-    'BTCUSDT':      (0.001, 0.001, 3),
-    'CLUSDT':       (0.01,  0.01,  2),   # Crude Oil (WTI) perpetual
-    'DOGEUSDT':     (1.0,   1.0,   0),
-    'ETHUSDT':      (0.001, 0.001, 3),
-    'FARTCOINUSDT': (0.1,   0.1,   1),
-    'JTOUSDT':      (1.0,   1.0,   0),
-    'JUPUSDT':      (1.0,   1.0,   0),
-    'NEARUSDT':     (1.0,   1.0,   0),
-    'ONDOUSDT':     (0.1,   0.1,   1),
-    'ORDIUSDT':     (1,     1,     0),
-    'SOLUSDT':      (0.01,  0.01,  2),
-    'SUIUSDT':      (0.1,   0.1,   1),
-    'XAUUSDT':      (0.001, 0.001, 3),
-    'XRPUSDT':      (0.1,   0.1,   1),
+    'BTCUSD_PERP':  (1, 1, 0),   # $100/contract
+    'ETHUSD_PERP':  (1, 1, 0),   # $10/contract
+    'BNBUSD_PERP':  (1, 1, 0),
+    'XRPUSD_PERP':  (1, 1, 0),
+    'ADAUSD_PERP':  (1, 1, 0),
+    'DOTUSD_PERP':  (1, 1, 0),
+    'LINKUSD_PERP': (1, 1, 0),
+    'LTCUSD_PERP':  (1, 1, 0),
+    'BCHUSD_PERP':  (1, 1, 0),
+    'SOLUSD_PERP':  (1, 1, 0),
+    'AVAXUSD_PERP': (1, 1, 0),
+    'DOGEUSD_PERP': (1, 1, 0),
+    'TRXUSD_PERP':  (1, 1, 0),
+    'ETCUSD_PERP':  (1, 1, 0),
 }
-MAX_STEPS = 50  # matches Streamlit
-
-# CoinM lot specs (lots = contracts; BTC=$100/contract, others=$10/contract)
+MAX_STEPS = 50
 
 
 # ── Template filters ─────────────────────────────────────────────────────────
@@ -91,26 +88,27 @@ def capfmt(v):
 def _sidebar_defaults():
     """Defaults that match the Streamlit app exactly."""
     return dict(
-        symbol='SOLUSDT',
+        symbol='BTCUSD_PERP',
         trading_tf='1h',
-        atr_tf='4h',        # auto from TF_RULE for 1h
-        atr_period=5,       # matches Streamlit default
+        atr_tf='4h',
+        atr_period=5,
         price_val=0.0,
         atr_val=0.0,
-        efficiency_buffer=0.80,   # matches Streamlit default
+        efficiency_buffer=0.80,
         reward_ratio=2.5,
-        base_lots=1.0,
-        leverage=10,              # matches Streamlit default
+        base_lots=1.0,       # contracts (integer)
+        leverage=10,
         capital=1000.0,
-        fee_rate_pct=0.05,
-        maker_fee_pct=0.02,
-        slippage_label='0.05% — Liquid pairs (BTC / ETH)',  # matches Streamlit default index=1
+        fee_rate_pct=0.05,   # taker
+        maker_fee_pct=0.02,  # maker (TP limit orders)
+        slippage_label='0.05% — Liquid pairs (BTC / ETH)',
         ws_limit_on=False,
-        ws_limit=7,               # matches Streamlit default
-        atr_guard_on=True,        # matches Streamlit default
-        atr_guard_multiplier=1.0, # matches Streamlit default
+        ws_limit=7,
+        atr_guard_on=True,
+        atr_guard_multiplier=1.0,
         use_live=True,
-        base_asset='SOL',
+        base_asset='BTC',
+        face_value=100.0,    # $100/contract for BTC
         dual_atr_on=False,
         atr_period_2=14,
         dual_atr_mode='min',
@@ -127,7 +125,8 @@ def _parse_sidebar(form, sess):
 
     sym = src.get('symbol', d['symbol'])
     d['symbol'] = sym
-    d['base_asset'] = sym.replace('USDT', '').replace('BUSD', '')
+    d['base_asset'] = coinm_base_asset(sym)
+    d['face_value'] = float(coinm_contract_size(sym))
 
     for key in ('trading_tf', 'atr_tf', 'dual_atr_mode', 'sl_mode'):
         if src.get(key):
@@ -167,13 +166,13 @@ def _parse_sidebar(form, sess):
     except (ValueError, IndexError):
         d['slip_pct'] = 0.0005  # default to liquid pairs
 
-    # Lot spec for display
-    min_qty, step, dec = LOT_SPECS.get(sym, (0.001, 0.001, 3))
+    # CoinM: all contracts use integer step (1 contract minimum)
+    min_qty, step, dec = LOT_SPECS.get(sym, (1, 1, 0))
     d['lot_min'] = min_qty
     d['lot_step'] = step
     d['lot_dec'] = dec
     if d['base_lots'] < min_qty:
-        d['base_lots'] = max(1.0, min_qty)
+        d['base_lots'] = max(1, min_qty)
 
     return d
 
@@ -440,9 +439,12 @@ def _bt_worker(job_id: str):
         atr_interval = d['atr_tf']
         bt_days = d.get('bt_days', 365)
 
+        face_value = float(coinm_contract_size(d['symbol']))
+
         upd(5, f'Fetching {trade_interval} candles…')
         trading_klines, err1 = fetch_historical_ohlcv(
             d['symbol'], trade_interval, days=bt_days,
+            market_type='coinm',
             progress_callback=lambda p: upd(int(5 + p * 35), f'Fetching {trade_interval} candles…'),
         )
         if err1:
@@ -451,6 +453,7 @@ def _bt_worker(job_id: str):
         upd(40, f'Fetching {atr_interval} ATR candles…')
         atr_klines, err2 = fetch_historical_ohlcv(
             d['symbol'], atr_interval, days=bt_days,
+            market_type='coinm',
             progress_callback=lambda p: upd(int(40 + p * 35), f'Fetching {atr_interval} candles…'),
         )
         if err2:
@@ -459,7 +462,7 @@ def _bt_worker(job_id: str):
         trading_candles = klines_to_candles(trading_klines)
         atr_candles = klines_to_candles(atr_klines)
 
-        upd(78, 'Running CHV backtest…')
+        upd(78, 'Running CHV CoinM backtest…')
         result = run_backtest(
             symbol=d['symbol'],
             trading_candles=trading_candles,
@@ -480,8 +483,9 @@ def _bt_worker(job_id: str):
             atr_guard_multiplier=d.get('atr_guard_multiplier', 1.0),
             min_notional_on=bool(d.get('min_notional_on', False)),
             fixed_margin=float(d['target_margin']) if d.get('fixed_margin_on') else 0.0,
-            lot_step=LOT_SPECS.get(d.get('symbol', ''), (0.001, 0.001, 3))[1],
+            lot_step=LOT_SPECS.get(d.get('symbol', ''), (1, 1, 0))[1],
             sl_mode=d.get('sl_mode', 'wick'),
+            face_value=face_value,
         )
         upd(92, 'Saving CSV…')
         _save_bt_csv(result, d)
@@ -645,7 +649,9 @@ def bt_result_view(job_id):
             failed_lots = (round(liq_c.base_lots * 0.5, 6)
                            if ws_n == 1
                            else round(last_lots * 1.5, 6))
-            failed_margin = (failed_lots * sl_price) / _leverage
+            _face_value = float(d_job.get('face_value', coinm_contract_size(d_job.get('symbol', 'BTCUSD_PERP'))))
+            # CoinM: margin = contracts × face_value / leverage (price-independent)
+            failed_margin = (failed_lots * _face_value) / _leverage
             # Capital at the START of the liquidation cycle
             cap_before = bt_cap
             for c in result.cycles:
@@ -929,12 +935,12 @@ def history_clear():
 # ── API endpoints ─────────────────────────────────────────────────────────────
 @app.route('/sim/api/symbols')
 def api_symbols():
-    return jsonify(get_available_symbols())
+    return jsonify(get_coinm_symbols())
 
 
 @app.route('/sim/api/price-atr')
 def api_price_atr():
-    sym           = request.args.get('symbol', 'SOLUSDT')
+    sym           = request.args.get('symbol', 'BTCUSD_PERP')
     atr_tf        = request.args.get('atr_tf', '4h')
     period        = int(request.args.get('atr_period', 5))
     period_2      = int(request.args.get('atr_period_2', 0))
@@ -947,7 +953,8 @@ def api_price_atr():
             raw_ts   = int(_time.time() * 1000) - bt_days * 86_400_000
             midnight = (raw_ts // 86_400_000) * 86_400_000
             price, atr1, err, atr2 = fetch_price_and_atr_as_of(
-                sym, atr_tf, period, as_of_ts=midnight, atr_period_2=period_2)
+                sym, atr_tf, period, as_of_ts=midnight, atr_period_2=period_2,
+                market_type='coinm')
             if err:
                 return jsonify({'ok': False, 'error': err})
             as_of_date = datetime.datetime.utcfromtimestamp(
@@ -960,11 +967,11 @@ def api_price_atr():
             return jsonify({'ok': True, 'price': price, 'atr': atr1,
                             'as_of_date': as_of_date})
         # ── live fetch ──────────────────────────────────────────────────────
-        price, atr1, err = fetch_price_and_atr(sym, atr_tf, period)
+        price, atr1, err = fetch_price_and_atr(sym, atr_tf, period, market_type='coinm')
         if err:
             return jsonify({'ok': False, 'error': err})
         if period_2 > 0:
-            _, atr2, _ = fetch_price_and_atr(sym, atr_tf, period_2)
+            _, atr2, _ = fetch_price_and_atr(sym, atr_tf, period_2, market_type='coinm')
             atr_used = pick(atr1, atr2) if atr2 else atr1
             return jsonify({'ok': True, 'price': price,
                             'atr': round(atr_used, 6),

@@ -1,4 +1,4 @@
-"""CHV Recovery Trade — historical backtest engine."""
+"""CHV CoinM Simulator — historical backtest engine (inverse perpetual)."""
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict
@@ -75,10 +75,10 @@ class BacktestResult:
     liquidation_step: int         # whipsaw step inside that cycle
     liquidation_loss: float       # accumulated loss at point of liquidation
     data_exhausted: bool          # True if backtest ran out of candles naturally
-    min_notional_rejected: bool   # True if a cycle was stopped by Binance $5 minimum
-    min_notional_cycle: int       # cycle number that triggered the rejection
-    min_notional_price: float     # entry price at the rejected cycle
-    min_notional_inv_notional: float  # actual inv_lots × inv_price computed
+    min_notional_rejected: bool   # True if a cycle was stopped by min notional check
+    min_notional_cycle: int
+    min_notional_price: float
+    min_notional_inv_notional: float
     equity_curve: List[float]
     cycle_pnls: List[float]
     cycles: List[Cycle]
@@ -121,18 +121,26 @@ def simulate_cycle_on_candles(
     leverage: float,
     capital: float,
     fee_rate: float,
-    fee_rate_maker: float = 0.0002,  # TP fills only (limit orders = maker)
+    fee_rate_maker: float = 0.0002,
     slippage_pct: float = 0.0,
     start_direction: str = "LONG",
     max_whipsaws: int = 0,
-    sl_mode: str = 'wick',   # 'wick' = candle high/low, 'close' = candle close
+    sl_mode: str = 'wick',
+    face_value: float = 100.0,  # USD per contract: 100 for BTC, 10 for others
 ) -> tuple[List[CycleStep], int, float, bool, float, int, float]:
     """
-    Simulate one CHV cycle starting at start_idx.
-    start_direction: "LONG" opens at LP, "SHORT" opens at SP (momentum continuation).
-    Returns (steps, end_idx, net_pnl, capital_ok, peak_intra_loss, liquidation_step, total_fees).
-    liquidation_step = whipsaw number where capital ran out (0 if no liquidation).
-    Slippage is modelled as an additional cost per fill: lots × price × slippage_pct.
+    Simulate one CHV cycle on CoinM (inverse perpetual) contracts.
+
+    P&L formulas (all in USD, settled in base coin):
+      LONG  TP: contracts × face_value × d / lp
+      LONG  SL: contracts × face_value × c / lp  (loss)
+      SHORT TP: contracts × face_value × d / sp
+      SHORT SL: contracts × face_value × c / sp  (loss)
+
+    Fee: contracts × face_value × fee_rate  (notional-based, no price)
+    Margin: contracts × face_value / leverage  (price-independent)
+
+    Returns (steps, end_idx, net_pnl, capital_ok, peak_intra_loss, liq_step, total_fees).
     """
     steps: List[CycleStep] = []
     direction = start_direction
@@ -143,16 +151,15 @@ def simulate_cycle_on_candles(
     whipsaw_count = 0
     total_fees = 0.0
 
-    # Entry price depends on starting direction
     initial_price = lp if direction == "LONG" else sp
 
-    # Check if even the first position can be opened
-    if (lots * initial_price) / leverage > capital:
+    # Margin check: CoinM margin = contracts × face_value / leverage (price-independent)
+    if (lots * face_value) / leverage > capital:
         return steps, start_idx, 0.0, False, 0.0, 0, 0.0
 
-    # Step 1: open in start_direction — charge entry open fee + slippage
-    entry_fee  = lots * initial_price * fee_rate
-    entry_slip = lots * initial_price * slippage_pct
+    # Open entry position — fee on notional (no price dependency)
+    entry_fee  = lots * face_value * fee_rate
+    entry_slip = lots * face_value * slippage_pct
     total_fees += entry_fee
     balance    -= (entry_fee + entry_slip)
     steps.append(CycleStep(
@@ -165,12 +172,13 @@ def simulate_cycle_on_candles(
         candle = candles[idx]
 
         if direction == "LONG":
-            # Check TP first (TL) — limit order = maker fee
+            # TP at TL — limit order (maker fee)
             if candle.high >= tl:
-                fee = lots * tl * fee_rate_maker
-                slip = lots * tl * slippage_pct
+                fee  = lots * face_value * fee_rate_maker
+                slip = lots * face_value * slippage_pct
                 total_fees += fee
-                exit_pnl = (lots * d) - fee - slip
+                # LONG TP P&L = contracts × face_value × d / lp
+                exit_pnl = (lots * face_value * d / lp) - fee - slip
                 balance += exit_pnl
                 steps.append(CycleStep(
                     direction="EXIT_LONG", trigger_price=tl, lots=0,
@@ -179,28 +187,29 @@ def simulate_cycle_on_candles(
                 ))
                 return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
 
-            # Check SL (SP)
+            # SL at SP
             sl_trigger = candle.close <= sp if sl_mode == 'close' else candle.low <= sp
             if sl_trigger:
-                fee = lots * sp * fee_rate
-                slip = lots * sp * slippage_pct
+                fee  = lots * face_value * fee_rate
+                slip = lots * face_value * slippage_pct
                 total_fees += fee
-                loss = -(lots * c) - fee - slip
+                # LONG SL loss = contracts × face_value × c / lp
+                loss = -(lots * face_value * c / lp) - fee - slip
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:
                     peak_intra_loss = balance
-                # Correct lot formula: first inversion = base_lots × (x-1) = base_lots × 0.5
-                # Subsequent inversions = previous_lots × x = previous_lots × 1.5
+
                 next_lots = round(base_lots * 0.5, 6) if whipsaw_count == 1 else round(lots * 1.5, 6)
-                margin_needed = (next_lots * sp) / leverage
+                # CoinM margin is price-independent
+                margin_needed = (next_lots * face_value) / leverage
 
                 if margin_needed > capital or abs(balance) > capital:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
 
-                # Charge open fee + slippage for the new SHORT position
-                open_fee  = next_lots * sp * fee_rate
-                open_slip = next_lots * sp * slippage_pct
+                # Open new SHORT at SP
+                open_fee  = next_lots * face_value * fee_rate
+                open_slip = next_lots * face_value * slippage_pct
                 total_fees += open_fee
                 balance    -= (open_fee + open_slip)
                 if balance < peak_intra_loss:
@@ -214,7 +223,6 @@ def simulate_cycle_on_candles(
                 lots = next_lots
                 direction = "SHORT"
 
-                # Max whipsaw limit — stop AFTER the inversion step is logged
                 if max_whipsaws > 0 and whipsaw_count >= max_whipsaws:
                     steps.append(CycleStep(
                         direction="STOPPED", trigger_price=sp, lots=0,
@@ -224,12 +232,13 @@ def simulate_cycle_on_candles(
                     return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
 
         else:  # SHORT
-            # Check TP first (TS) — limit order = maker fee
+            # TP at TS — limit order (maker fee)
             if candle.low <= ts_level:
-                fee = lots * ts_level * fee_rate_maker
-                slip = lots * ts_level * slippage_pct
+                fee  = lots * face_value * fee_rate_maker
+                slip = lots * face_value * slippage_pct
                 total_fees += fee
-                exit_pnl = (lots * d) - fee - slip
+                # SHORT TP P&L = contracts × face_value × d / sp
+                exit_pnl = (lots * face_value * d / sp) - fee - slip
                 balance += exit_pnl
                 steps.append(CycleStep(
                     direction="EXIT_SHORT", trigger_price=ts_level, lots=0,
@@ -238,28 +247,28 @@ def simulate_cycle_on_candles(
                 ))
                 return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
 
-            # Check SL (LP)
+            # SL at LP
             sl_trigger = candle.close >= lp if sl_mode == 'close' else candle.high >= lp
             if sl_trigger:
-                fee = lots * lp * fee_rate
-                slip = lots * lp * slippage_pct
+                fee  = lots * face_value * fee_rate
+                slip = lots * face_value * slippage_pct
                 total_fees += fee
-                loss = -(lots * c) - fee - slip
+                # SHORT SL loss = contracts × face_value × c / sp
+                loss = -(lots * face_value * c / sp) - fee - slip
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:
                     peak_intra_loss = balance
-                # Correct lot formula: first inversion = base_lots × (x-1) = base_lots × 0.5
-                # Subsequent inversions = previous_lots × x = previous_lots × 1.5
+
                 next_lots = round(base_lots * 0.5, 6) if whipsaw_count == 1 else round(lots * 1.5, 6)
-                margin_needed = (next_lots * lp) / leverage
+                margin_needed = (next_lots * face_value) / leverage
 
                 if margin_needed > capital or abs(balance) > capital:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
 
-                # Charge open fee + slippage for the new LONG position
-                open_fee  = next_lots * lp * fee_rate
-                open_slip = next_lots * lp * slippage_pct
+                # Open new LONG at LP
+                open_fee  = next_lots * face_value * fee_rate
+                open_slip = next_lots * face_value * slippage_pct
                 total_fees += open_fee
                 balance    -= (open_fee + open_slip)
                 if balance < peak_intra_loss:
@@ -273,7 +282,6 @@ def simulate_cycle_on_candles(
                 lots = next_lots
                 direction = "LONG"
 
-                # Max whipsaw limit — stop AFTER the inversion step is logged
                 if max_whipsaws > 0 and whipsaw_count >= max_whipsaws:
                     steps.append(CycleStep(
                         direction="STOPPED", trigger_price=lp, lots=0,
@@ -282,7 +290,6 @@ def simulate_cycle_on_candles(
                     ))
                     return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
 
-    # Ran out of candles without resolving
     return steps, len(candles) - 1, round(balance, 4), capital_ok, round(peak_intra_loss, 4), 0, round(total_fees, 4)
 
 
@@ -291,23 +298,24 @@ def run_backtest(
     trading_candles: List[Candle],
     atr_candles: List[Candle],
     atr_period: int = 14,
-    atr_period_2: int = 0,        # 0 = disabled; if set, use min(ATR1, ATR2) each cycle
+    atr_period_2: int = 0,
     base_lots: float = 1.0,
     leverage: float = 10.0,
     capital: float = 1000.0,
-    fee_rate: float = 0.0005,        # taker rate (entry, SL close, inversion open)
-    fee_rate_maker: float = 0.0002,  # maker rate (TP close — limit order)
+    fee_rate: float = 0.0005,
+    fee_rate_maker: float = 0.0002,
     buffer: float = 0.8,
     slippage_pct: float = 0.0,
     reward_ratio: float = 2.5,
     max_whipsaws: int = 0,
     atr_guard: bool = True,
     atr_guard_multiplier: float = 1.0,
-    min_notional_on: bool = False,  # enforce Binance $5 min notional on WS1 inversion
-    fixed_margin: float = 0.0,      # >0 = fixed USD margin per cycle; lots computed dynamically
-    lot_step: float = 0.001,        # symbol lot step for rounding in fixed-margin mode
-    dual_atr_mode: str = 'min',     # 'min' or 'max' — which ATR to use when dual is active
-    sl_mode: str = 'wick',          # 'wick' = high/low trigger, 'close' = close price trigger
+    min_notional_on: bool = False,
+    fixed_margin: float = 0.0,
+    lot_step: float = 1.0,        # CoinM: integer contracts, so default step = 1
+    dual_atr_mode: str = 'min',
+    sl_mode: str = 'wick',
+    face_value: float = 100.0,    # USD per contract: 100 for BTC, 10 for others
 ) -> BacktestResult:
     from chv_engine import calculate_params
 
@@ -322,21 +330,15 @@ def run_backtest(
     i = atr_period + 2
     cycle_num = 0
     total_fees = 0.0
-    # running_capital grows/shrinks with accumulated P&L so each new cycle
-    # uses the actual available balance for margin and loss-limit checks.
     running_capital = capital
-    # First cycle always starts LONG; subsequent cycles continue in the
-    # same direction as the previous exit (momentum continuation).
     start_direction = "LONG"
 
-    # Min notional tracking
     mn_rejected = False
     mn_cycle    = 0
     mn_price    = 0.0
     mn_notional = 0.0
 
     while i < len(trading_candles) - 1:
-        # ATR from macro TF aligned to current position
         aligned = align_atr_candles(trading_candles, atr_candles, i)
         if len(aligned) < atr_period + 1:
             i += 1
@@ -346,7 +348,7 @@ def run_backtest(
         if atr_val <= 0:
             i += 1
             continue
-        # Dual ATR: if a second period is configured, take the lower value
+
         if atr_period_2 > 0 and len(aligned) >= atr_period_2 + 1:
             atr_val_2 = calc_atr(aligned, atr_period_2)
             if atr_val_2 > 0:
@@ -355,11 +357,9 @@ def run_backtest(
         entry_price = trading_candles[i].close
         params = calculate_params(symbol, entry_price, atr_val, buffer, reward_ratio, atr_guard_multiplier)
 
-        # Fixed-margin mode: recompute base_lots every cycle so margin stays constant.
-        # Both lot computation and $5 check use entry_price (candle close) for
-        # consistency — avoids LP/SP spread causing false rejections at step boundaries.
+        # Fixed-margin mode: CoinM margin = contracts × face_value / leverage (price-independent)
         if fixed_margin > 0 and lot_step > 0:
-            raw = fixed_margin * leverage / entry_price / lot_step
+            raw = fixed_margin * leverage / face_value / lot_step
             cycle_lots = round(math.floor(raw) * lot_step, 8)
             if cycle_lots <= 0:
                 i += 1
@@ -367,21 +367,16 @@ def run_backtest(
         else:
             cycle_lots = base_lots
 
-        # Binance $5 min notional check: WS1 inversion lot × entry_price must ≥ $5.
+        # Min notional check: WS1 inversion contracts × face_value must meet minimum
         if min_notional_on:
-            inv_lots  = round(cycle_lots * 0.5, 6)
-            if inv_lots * entry_price < 5.0:
+            inv_lots = round(cycle_lots * 0.5, 6)
+            if inv_lots * face_value < face_value:  # less than 1 contract
                 mn_rejected = True
                 mn_cycle    = cycle_num + 1
                 mn_price    = entry_price
-                mn_notional = round(inv_lots * entry_price, 4)
+                mn_notional = round(inv_lots * face_value, 4)
                 break
 
-        # ATR Guard: compare footprint to trading TF ATR (not macro ATR).
-        # Macro ATR sizes the bracket; trading TF ATR reflects how much price
-        # actually moves per candle right now. If footprint exceeds the trading
-        # TF ATR × multiplier, each candle is too small to resolve the cycle →
-        # likely whipsaw territory. Skip and wait for volatility to return.
         if atr_guard:
             trading_tf_atr = calc_atr(
                 trading_candles[max(0, i - atr_period):i + 1], atr_period
@@ -398,9 +393,9 @@ def run_backtest(
             start_direction=start_direction,
             max_whipsaws=max_whipsaws,
             sl_mode=sl_mode,
+            face_value=face_value,
         )
 
-        # No steps means the first-position margin check failed — skip this candle.
         if not steps:
             i += 1
             continue
@@ -455,13 +450,9 @@ def run_backtest(
         )
         cycles.append(cycle)
 
-        # Stop if the account is genuinely blown (liquidation cycle is now recorded above).
         if not capital_ok or running_capital <= 0:
             break
 
-        # Momentum continuation: next cycle starts in same direction as this exit.
-        # ABORTED cycles keep the same direction as before.
-        # STOPPED cycles reset to LONG (neutral re-entry after deliberate stop).
         if exit_dir == "EXIT_LONG":
             start_direction = "LONG"
         elif exit_dir == "EXIT_SHORT":

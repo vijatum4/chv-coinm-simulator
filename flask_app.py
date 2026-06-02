@@ -82,6 +82,8 @@ def btcfmt(v):
         v = float(v)
     except (TypeError, ValueError):
         return '—'
+    if v == 0:
+        v = 0.0   # normalise -0.0 → 0.0 so sign is always '+'
     sign = '+' if v >= 0 else ''
     av = abs(v)
     if av >= 1:       return f'{sign}{v:.4f}'

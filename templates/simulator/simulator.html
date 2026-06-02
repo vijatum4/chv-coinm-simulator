@@ -105,7 +105,7 @@
 <div class="alert alert-red" style="margin-bottom:14px">
   💀 Capital runs out at step {{ result.danger_step }}
   (${{ '%.2f'|format(result.danger_margin) }} needed, ${{ '%.2f'|format(capital) }} available).
-  Increase capital, reduce base lots, or lower leverage.
+  Increase capital, reduce base contracts, or lower leverage.
 </div>
 {% elif result.steps_covered < 5 %}
 <div class="alert alert-gold" style="margin-bottom:14px">
@@ -126,7 +126,7 @@
           <th>#</th>
           <th>Direction</th>
           <th>Trigger Price</th>
-          <th>Active Lots</th>
+          <th>Contracts</th>
           <th>Step P&amp;L</th>
           <th>Running Balance</th>
           <th>Margin Req</th>

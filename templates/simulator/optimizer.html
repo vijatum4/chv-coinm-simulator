@@ -55,7 +55,7 @@
       <div>
         <div class="sf-row">
           <label class="sf-field-label">Base Lot Sizes (comma-separated)</label>
-          <input class="sf-input mono" type="text" name="opt_lots" value="1.0, 5.0, 10.0"
+          <input class="sf-input mono" type="text" name="opt_lots" value="1, 5, 10, 20"
                  placeholder="e.g. 1.0, 5.0, 10.0">
         </div>
         <div class="sf-row" style="margin-top:12px">
@@ -93,7 +93,7 @@
           <th>#</th>
           <th>Buffer</th>
           <th>Leverage</th>
-          <th>Base Lots</th>
+          <th>Base Contracts</th>
           <th>Net P&amp;L</th>
           <th>Steps</th>
           <th>Capital Safe</th>
@@ -126,7 +126,7 @@
   <div class="empty-state">
     <div class="es-icon">⚡</div>
     <div class="es-text">Set ranges and click Run Optimizer</div>
-    <div class="es-sub">Sweeps buffer × leverage × lots combinations and ranks by score</div>
+    <div class="es-sub">Sweeps buffer × leverage × contracts combinations and ranks by score</div>
   </div>
 </div>
 {% endif %}

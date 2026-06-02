@@ -109,7 +109,17 @@ def simulate(
     capital: float,
     max_steps: int = 15,
     fee_rate: float = 0.001,
+    face_value: float = 100.0,  # USD per contract: 100 for BTC, 10 for others
 ) -> SimResult:
+    """
+    CoinM inverse perpetual P&L formulas:
+      SL loss  (LONG, entry LP, exit SP): contracts × face_value × c / lp
+      SL loss (SHORT, entry SP, exit LP): contracts × face_value × c / sp
+      TP profit (LONG, entry LP, exit TL): contracts × face_value × d / lp
+      TP profit(SHORT, entry SP, exit TS): contracts × face_value × d / sp
+      Fee: contracts × face_value × fee_rate  (notional-based, no price)
+      Margin: contracts × face_value / leverage  (price-independent)
+    """
     steps: List[LedgerStep] = []
     balance = 0.0
     lots = base_lots
@@ -117,7 +127,8 @@ def simulate(
     resolved = False
     resolution_step = None
 
-    margin_1 = (lots * params.lp) / leverage
+    # CoinM: margin = contracts × face_value / leverage (price-independent)
+    margin_1 = (lots * face_value) / leverage
     steps.append(LedgerStep(
         step=1, trigger_price=params.lp, direction="LONG",
         execution="Open Primary LONG", active_lots=round(lots, 6),
@@ -127,41 +138,40 @@ def simulate(
 
     for n in range(2, max_steps + 2):
         if direction == "LONG":
+            # LONG stopped at SP: loss = contracts × face_value × c / lp
             trigger = params.sp
-            pnl = -(lots * params.c * leverage) - (lots * trigger * fee_rate)
+            pnl = -(lots * face_value * params.c / params.lp) - (lots * face_value * fee_rate)
             balance += pnl
-            # Correct lot formula: first inversion (n==2) = base_lots × 0.5
-            # Subsequent inversions = previous_lots × 1.5
             next_lots = round(base_lots * 0.5, 6) if n == 2 else round(lots * 1.5, 6)
             steps.append(LedgerStep(
                 step=n, trigger_price=trigger, direction="SHORT",
                 execution="Invert to SHORT (SL Hit)",
                 active_lots=next_lots, closed_pnl=round(pnl, 4),
                 running_balance=round(balance, 4),
-                margin_required=round((next_lots * trigger) / leverage, 4),
+                margin_required=round((next_lots * face_value) / leverage, 4),
             ))
             lots = next_lots
             direction = "SHORT"
         else:
+            # SHORT stopped at LP: loss = contracts × face_value × c / sp
             trigger = params.lp
-            pnl = -(lots * params.c * leverage) - (lots * trigger * fee_rate)
+            pnl = -(lots * face_value * params.c / params.sp) - (lots * face_value * fee_rate)
             balance += pnl
-            # Correct lot formula: first inversion (n==2) = base_lots × 0.5
-            # Subsequent inversions = previous_lots × 1.5
             next_lots = round(base_lots * 0.5, 6) if n == 2 else round(lots * 1.5, 6)
             steps.append(LedgerStep(
                 step=n, trigger_price=trigger, direction="LONG",
                 execution="Invert to LONG (SL Hit)",
                 active_lots=next_lots, closed_pnl=round(pnl, 4),
                 running_balance=round(balance, 4),
-                margin_required=round((next_lots * trigger) / leverage, 4),
+                margin_required=round((next_lots * face_value) / leverage, 4),
             ))
             lots = next_lots
             direction = "LONG"
 
-        # Test if current leg TP produces net positive
+        # Test if current leg TP recovers all losses
         ep = params.tl if direction == "LONG" else params.ts
-        exit_pnl = (lots * params.d * leverage) - (lots * ep * fee_rate)
+        entry_for_tp = params.lp if direction == "LONG" else params.sp
+        exit_pnl = (lots * face_value * params.d / entry_for_tp) - (lots * face_value * fee_rate)
         if balance + exit_pnl > 0:
             final = round(balance + exit_pnl, 4)
             steps.append(LedgerStep(
@@ -193,23 +203,23 @@ def simulate(
             capital_survives = False
             break
 
-    # Theoretical capacity: how many whipsaws capital can fund before hitting
-    # either the margin limit (can't open next position) or the accumulated-loss
-    # limit (total realized losses exceed capital) — whichever comes first.
-    # Uses correct lot formula: first inversion = base_lots × 0.5, then × 1.5.
+    # Theoretical whipsaw capacity — CoinM: margin and loss both use face_value, not price
     theo_lots = base_lots
     steps_covered = 0
     accumulated_loss = 0.0
-    entry_price = max(params.lp, params.sp)
     is_first_inversion = True
+    # Alternate LONG/SHORT: use lp for LONG loss, sp for SHORT loss
+    theo_direction = "LONG"
     for _ in range(300):
-        accumulated_loss += theo_lots * params.c * leverage
+        loss_price = params.lp if theo_direction == "LONG" else params.sp
+        accumulated_loss += theo_lots * face_value * params.c / loss_price
         if is_first_inversion:
             theo_lots = round(base_lots * 0.5, 6)
             is_first_inversion = False
         else:
             theo_lots = round(theo_lots * 1.5, 6)
-        margin = (theo_lots * entry_price) / leverage
+        theo_direction = "SHORT" if theo_direction == "LONG" else "LONG"
+        margin = (theo_lots * face_value) / leverage
         if margin > capital or accumulated_loss > capital:
             break
         steps_covered += 1
@@ -252,21 +262,22 @@ def optimize(
     leverages: List[float] = None,
     lot_sizes: List[float] = None,
     max_steps: int = 15,
+    face_value: float = 100.0,
 ) -> List[OptimResult]:
     if buffers is None:
         buffers = [0.7, 0.75, 0.8, 0.85, 0.9]
     if leverages is None:
         leverages = [5, 10, 20, 25, 50]
     if lot_sizes is None:
-        lot_sizes = [0.001, 0.005, 0.01, 0.05, 0.1]
+        # CoinM: integer contracts
+        lot_sizes = [1, 2, 5, 10, 20, 50]
 
     results = []
     for buf, lev, lots in itertools.product(buffers, leverages, lot_sizes):
         params = calculate_params(symbol, price, atr, buf)
         if not params.is_safe:
             continue
-        sim = simulate(params, lots, lev, capital, max_steps, fee_rate)
-        # Score: positive pnl + more steps + capital safety weighted
+        sim = simulate(params, lots, lev, capital, max_steps, fee_rate, face_value)
         score = (
             (sim.net_pnl if sim.net_pnl > 0 else -9999)
             + sim.steps_covered * 10
@@ -315,7 +326,7 @@ def generate_bot_config(
         "strategy": {
             "name": "CHV_RECOVERY",
             "symbol": params.symbol,
-            "market_type": "FUTURES_USDT",
+            "market_type": "FUTURES_COIN",
             "active": False,
         },
         "parameters": {

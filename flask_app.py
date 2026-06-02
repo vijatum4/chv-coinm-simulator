@@ -552,6 +552,7 @@ def simulator():
                 d['base_lots'], d['leverage'], d['capital'],
                 MAX_STEPS,
                 d['fee_rate_pct'] / 100.0,
+                face_value=d.get('face_value', 100.0),
             )
         except Exception as ex:
             error = str(ex)
@@ -811,6 +812,7 @@ def optimizer_view():
                 leverages=leverages,
                 lot_sizes=lot_sizes,
                 max_steps=MAX_STEPS,
+                face_value=d.get('face_value', 100.0),
             )
 
             for r in sweep_results:

@@ -347,29 +347,8 @@ def get_available_symbols(limit: int = 50) -> list:
 # ── CoinM (Inverse Perpetual) helpers ────────────────────────────────────────
 
 def get_coinm_symbols() -> list:
-    """Return available CoinM perpetual symbols from Binance dapi exchange info."""
-    try:
-        import requests
-        r = requests.get(
-            "https://dapi.binance.com/dapi/v1/exchangeInfo", timeout=8
-        )
-        data = r.json()
-        perps = [
-            s['symbol'] for s in data.get('symbols', [])
-            if s.get('contractType') == 'PERPETUAL'
-            and s.get('contractStatus') == 'TRADING'
-            and s['symbol'].endswith('_PERP')
-        ]
-        # Priority order: BTC first, then majors, then rest alphabetically
-        priority = ['BTCUSD_PERP', 'ETHUSD_PERP', 'BNBUSD_PERP', 'XRPUSD_PERP',
-                    'SOLUSD_PERP', 'ADAUSD_PERP', 'LINKUSD_PERP', 'LTCUSD_PERP',
-                    'BCHUSD_PERP', 'DOTUSD_PERP', 'AVAXUSD_PERP', 'DOGEUSD_PERP']
-        ordered = [p for p in priority if p in perps]
-        rest = sorted(s for s in perps if s not in priority)
-        return ordered + rest
-    except Exception:
-        return ['BTCUSD_PERP', 'ETHUSD_PERP', 'BNBUSD_PERP', 'XRPUSD_PERP',
-                'SOLUSD_PERP', 'ADAUSD_PERP', 'LTCUSD_PERP', 'BCHUSD_PERP']
+    """Return the curated list of supported CoinM perpetual symbols."""
+    return ['BTCUSD_PERP', 'SOLUSD_PERP', 'NEARUSD_PERP', 'SUIUSD_PERP', 'TRXUSD_PERP']
 
 
 def coinm_contract_size(symbol: str) -> int:

@@ -53,11 +53,7 @@ TF_RULE = {
 # All CoinM symbols use integer contracts (step=1), face_value from coinm_contract_size()
 # All CoinM symbols: integer contracts, step=1, dec=0. BTC=$100/contract, others=$10.
 LOT_SPECS = {s: (1, 1, 0) for s in [
-    'AAVEUSD_PERP', 'ADAUSD_PERP', 'AVAXUSD_PERP', 'BCHUSD_PERP',
-    'BNBUSD_PERP',  'BTCUSD_PERP', 'DOGEUSD_PERP', 'DOTUSD_PERP',
-    'ETCUSD_PERP',  'ETHUSD_PERP', 'FILUSD_PERP',  'LINKUSD_PERP',
-    'LTCUSD_PERP',  'NEARUSD_PERP','SOLUSD_PERP',  'SUIUSD_PERP',
-    'TRXUSD_PERP',  'UNIUSD_PERP', 'XLMUSD_PERP',  'XRPUSD_PERP',
+    'BTCUSD_PERP', 'SOLUSD_PERP', 'NEARUSD_PERP', 'SUIUSD_PERP', 'TRXUSD_PERP',
 ]}
 MAX_STEPS = 50
 

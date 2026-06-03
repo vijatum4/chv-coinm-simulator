@@ -736,7 +736,7 @@ input[type=range].sf-range::-moz-range-track{
             <span class="sf-slider-badge" id="bufferBadge">{{ efficiency_buffer }}</span>
           </div>
           <input class="sf-range" type="range" id="bufferRange" name="efficiency_buffer"
-                 min="0.5" max="5" step="0.5" value="{{ efficiency_buffer }}"
+                 min="0.5" max="5" step="0.05" value="{{ efficiency_buffer }}"
                  oninput="document.getElementById('bufferBadge').textContent=parseFloat(this.value).toFixed(2)">
         </div>
 

@@ -752,8 +752,8 @@ def bt_result_view(job_id):
     total_pnl_btc = sum(pnl_btc_list)
     fees_btc = result.total_fees   # engine total_fees also in base coin
     total_equity_btc = capital_btc + total_pnl_btc
-    worst_intra_btc = result.worst_intra_loss / conversion_price
-    max_drawdown_btc = result.max_drawdown / conversion_price
+    worst_intra_btc = result.worst_intra_loss   # already base coin (SOL) — do NOT divide
+    max_drawdown_btc = result.max_drawdown       # already base coin (SOL) — do NOT divide
 
     # Running BTC capital for cap_at_worst
     cap_btc_running = capital_btc

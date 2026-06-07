@@ -212,7 +212,7 @@
       <strong style="font-size:14px">Account LIQUIDATED — Cycle {{ result.liquidation_cycle }}, Whipsaw #{{ result.liquidation_step }}</strong>
       <div style="font-size:12px;margin-top:3px;color:var(--neg);opacity:0.85">
         {% if liq_detail and liq_detail.reason == 'loss' %}
-        Cumulative whipsaw losses ({{ (liq_detail.cum_loss / conversion_price) | btcfmt }} {{ currency_sym }}) exceeded available capital — the account went negative before the next inversion could be placed.
+        Cumulative whipsaw losses ({{ liq_detail.cum_loss | btcfmt }} {{ currency_sym }}) exceeded available capital — the account went negative before the next inversion could be placed.
         {% else %}
         The next inversion required more margin than available capital.
         {% endif %}
@@ -244,21 +244,21 @@
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Margin Needed</div>
-      <div class="liq-val{% if liq_detail.reason == 'margin' %} liq-bad{% endif %}">{{ (liq_detail.failed_margin / conversion_price) | coinfmt }} {{ currency_sym }}</div>
+      <div class="liq-val{% if liq_detail.reason == 'margin' %} liq-bad{% endif %}">{{ liq_detail.failed_margin | coinfmt }} {{ currency_sym }}</div>
     </div>
     <div class="liq-card">
       <div class="liq-lbl">Capital Available</div>
-      <div class="liq-val">{{ (liq_detail.cap_before / conversion_price) | coinfmt }} {{ currency_sym }}</div>
+      <div class="liq-val">{{ liq_detail.cap_before | coinfmt }} {{ currency_sym }}</div>
     </div>
     {% if liq_detail.reason == 'margin' %}
     <div class="liq-card">
       <div class="liq-lbl">Shortfall</div>
-      <div class="liq-val liq-bad">{{ (liq_detail.shortfall / conversion_price) | btcfmt }} {{ currency_sym }}</div>
+      <div class="liq-val liq-bad">{{ liq_detail.shortfall | btcfmt }} {{ currency_sym }}</div>
     </div>
     {% else %}
     <div class="liq-card">
       <div class="liq-lbl">Loss vs Capital</div>
-      <div class="liq-val liq-bad">{{ (liq_detail.net_remaining / conversion_price) | btcfmt }} {{ currency_sym }} over</div>
+      <div class="liq-val liq-bad">{{ liq_detail.net_remaining | btcfmt }} {{ currency_sym }} over</div>
     </div>
     {% endif %}
   </div>

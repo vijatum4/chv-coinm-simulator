@@ -153,8 +153,9 @@ def simulate_cycle_on_candles(
 
     initial_price = lp if direction == "LONG" else sp
 
-    # Margin check: CoinM margin = contracts × face_value / leverage (price-independent)
-    if (lots * face_value) / leverage > capital:
+    # capital is in BASE COIN (BTC/SOL). CoinM initial margin in base coin =
+    # (contracts × face_value) / (leverage × price). Can't open if it exceeds capital.
+    if (lots * face_value) / (leverage * initial_price) > capital:
         return steps, start_idx, 0.0, False, 0.0, 0, 0.0
 
     # Open entry position — fee in base coin = notional_USD × rate / fill_price
@@ -206,10 +207,11 @@ def simulate_cycle_on_candles(
                     peak_intra_loss = balance
 
                 next_lots = round(base_lots * 0.5, 6) if whipsaw_count == 1 else round(lots * 1.5, 6)
-                # CoinM margin is price-independent
-                margin_needed = (next_lots * face_value) / leverage
-
-                if margin_needed > capital or abs(balance) > capital:
+                # Liquidation check in BASE COIN: realized losses so far reduce equity;
+                # can't post the next leg's margin (price-aware) → cycle blows up.
+                next_margin = (next_lots * face_value) / (leverage * sl_fill)
+                equity = capital + balance   # balance is negative during cascade
+                if equity <= 0 or next_margin > equity:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
 
                 # Open new SHORT at sl_fill — fee in base coin
@@ -268,9 +270,10 @@ def simulate_cycle_on_candles(
                     peak_intra_loss = balance
 
                 next_lots = round(base_lots * 0.5, 6) if whipsaw_count == 1 else round(lots * 1.5, 6)
-                margin_needed = (next_lots * face_value) / leverage
-
-                if margin_needed > capital or abs(balance) > capital:
+                # Liquidation check in BASE COIN (price-aware), same as LONG branch.
+                next_margin = (next_lots * face_value) / (leverage * sl_fill)
+                equity = capital + balance   # balance is negative during cascade
+                if equity <= 0 or next_margin > equity:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
 
                 # Open new LONG at sl_fill — fee in base coin

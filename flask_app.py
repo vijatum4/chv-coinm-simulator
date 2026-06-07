@@ -586,7 +586,7 @@ def _bt_worker(job_id: str):
             dual_atr_mode=d.get('dual_atr_mode', 'min'),
             base_lots=d['base_lots'],
             leverage=int(d['leverage']),
-            capital=capital_usd,
+            capital=capital_btc,   # base coin — engine does all margin/liq checks in base coin
             fee_rate=d['fee_rate_pct'] / 100.0,
             fee_rate_maker=d.get('maker_fee_pct', 0.02) / 100.0,
             buffer=d['efficiency_buffer'],
@@ -787,20 +787,19 @@ def bt_result_view(job_id):
                            if ws_n == 1
                            else round(last_lots * 1.5, 6))
             _face_value = float(d_job.get('face_value', coinm_contract_size(d_job.get('symbol', 'BTCUSD_PERP'))))
-            # CoinM: margin = contracts × face_value / leverage (price-independent)
-            failed_margin = (failed_lots * _face_value) / _leverage
-            # Capital at the START of the liquidation cycle
-            cap_before = bt_cap
+            # All in BASE COIN. CoinM next-leg margin (price-aware) the cascade couldn't post.
+            failed_margin = (failed_lots * _face_value) / (_leverage * sl_price)
+            # Capital (base coin) at the START of the liquidation cycle
+            cap_before = capital_btc
             for c in result.cycles:
                 if c.cycle_num == liq_c.cycle_num:
                     break
                 cap_before += c.net_pnl
-            shortfall = failed_margin - cap_before
-            cum_loss  = result.liquidation_loss          # negative number
-            # Determine which engine condition actually fired:
-            # A) margin_needed > capital  →  shortfall > 0
-            # B) abs(balance) > capital   →  abs(cum_loss) > cap_before
-            reason = 'margin' if shortfall > 0 else 'loss'
+            cum_loss   = result.liquidation_loss          # negative: balance at liquidation
+            equity_at  = cap_before + cum_loss            # remaining equity when it blew
+            shortfall  = failed_margin - equity_at
+            # 'loss' = accumulated losses wiped equity; 'margin' = couldn't post next leg
+            reason = 'loss' if equity_at <= 0 else 'margin'
             liq_detail = {
                 'cycle':         result.liquidation_cycle,
                 'ws':            ws_n,
@@ -811,7 +810,7 @@ def bt_result_view(job_id):
                 'cap_before':    cap_before,
                 'shortfall':     shortfall,
                 'cum_loss':      cum_loss,
-                'net_remaining': cap_before + cum_loss,  # negative when losses > capital
+                'net_remaining': equity_at,  # remaining equity (negative when losses > capital)
                 'reason':        reason,
             }
 

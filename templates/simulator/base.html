@@ -845,6 +845,7 @@ input[type=range].sf-range::-moz-range-track{
           </div>
           <input type="hidden" name="sl_mode" id="slModeInput" value="{{ sl_mode }}">
         </div>
+        <div id="slCloseWarn" class="sf-caption" style="margin-top:-8px;color:var(--gold);{% if sl_mode != 'close' %}display:none;{% endif %}">⚠ Close-mode stops market-fill at the candle close (overshoot). Bracket <b>c</b> must exceed a typical trading-TF candle range or the strategy bleeds.</div>
 
         <label class="sf-toggle">
           <input type="checkbox" name="ws_limit_on" id="wsLimitCheck"
@@ -1049,6 +1050,8 @@ function setSlMode(mode) {
   var wickBtn  = document.getElementById('slModeWick');
   var closeBtn = document.getElementById('slModeClose');
   if (input) input.value = mode;
+  var warn = document.getElementById('slCloseWarn');
+  if (warn) warn.style.display = (mode === 'close') ? '' : 'none';
   if (wickBtn && closeBtn) {
     if (mode === 'wick') {
       wickBtn.style.background  = 'var(--green)'; wickBtn.style.color  = '#fff'; wickBtn.style.fontWeight  = '700';

@@ -152,6 +152,7 @@ def simulate_cycle_on_candles(
     total_fees = 0.0
 
     initial_price = lp if direction == "LONG" else sp
+    entry_px = initial_price   # ACTUAL fill price of the current open leg (not the bracket)
 
     # capital is in BASE COIN (BTC/SOL). CoinM initial margin in base coin =
     # (contracts × face_value) / (leverage × price). Can't open if it exceeds capital.
@@ -169,6 +170,14 @@ def simulate_cycle_on_candles(
         timestamp=candles[start_idx].timestamp,
     ))
 
+    # Inverse-perp realized P&L (base coin) from a leg's ACTUAL entry to its exit.
+    # Using the real entry (not the bracket / d-shortcut) is what makes close-mode
+    # overshoot fills book correctly.
+    def _pnl(dir_, lots_, ent, ex):
+        if dir_ == "LONG":
+            return lots_ * face_value * (1.0 / ent - 1.0 / ex)
+        return lots_ * face_value * (1.0 / ex - 1.0 / ent)
+
     # Start from start_idx + 1: LP = candle[start_idx].close, so that candle's
     # high/low happened BEFORE the close. Orders are placed after close; the
     # first candle eligible for TP/SL is the next one.
@@ -176,13 +185,13 @@ def simulate_cycle_on_candles(
         candle = candles[idx]
 
         if direction == "LONG":
-            # TP at TL — limit order (maker fee)
+            # TP at TL — resting limit (maker), fills at the limit price tl
             if candle.high >= tl:
                 fee  = lots * face_value * fee_rate_maker / tl
                 slip = lots * face_value * slippage_pct / tl
                 total_fees += fee
-                # LONG TP: contracts × face_value × d / (LP × TL)  [exact CoinM formula]
-                exit_pnl = (lots * face_value * d / (lp * tl)) - fee - slip
+                # P&L from this leg's ACTUAL entry (not the d-shortcut)
+                exit_pnl = _pnl("LONG", lots, entry_px, tl) - fee - slip
                 balance += exit_pnl
                 steps.append(CycleStep(
                     direction="EXIT_LONG", trigger_price=tl, lots=0,
@@ -194,13 +203,13 @@ def simulate_cycle_on_candles(
             # SL at SP
             sl_trigger = candle.close <= sp if sl_mode == 'close' else candle.low <= sp
             if sl_trigger:
-                sl_fill = min(candle.open, sp) if sl_mode == 'wick' else candle.close
-                actual_c = lp - sl_fill  # real exit distance (≥ c on gap or deep close)
+                # Real fill: close-mode market-fills at the candle close (overshoot past SP);
+                # wick-mode (stop-market) fills at the bracket, gap-aware.
+                sl_fill = candle.close if sl_mode == 'close' else min(candle.open, sp)
                 fee  = lots * face_value * fee_rate / sl_fill
                 slip = lots * face_value * slippage_pct / sl_fill
                 total_fees += fee
-                # LONG SL: contracts × face_value × c / (LP × sl_fill)  [exact CoinM formula]
-                loss = -(lots * face_value * actual_c / (lp * sl_fill)) - fee - slip
+                loss = _pnl("LONG", lots, entry_px, sl_fill) - fee - slip   # negative
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:
@@ -214,7 +223,8 @@ def simulate_cycle_on_candles(
                 if equity <= 0 or next_margin > equity:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
 
-                # Open new SHORT at sl_fill — fee in base coin
+                # Invert to SHORT. Entry = REAL fill (close mode) or bracket SP (wick — unchanged).
+                inv_entry = sl_fill if sl_mode == 'close' else sp
                 open_fee  = next_lots * face_value * fee_rate / sl_fill
                 open_slip = next_lots * face_value * slippage_pct / sl_fill
                 total_fees += open_fee
@@ -229,6 +239,7 @@ def simulate_cycle_on_candles(
                 ))
                 lots = next_lots
                 direction = "SHORT"
+                entry_px = inv_entry
 
                 if max_whipsaws > 0 and whipsaw_count >= max_whipsaws:
                     steps.append(CycleStep(
@@ -238,14 +249,32 @@ def simulate_cycle_on_candles(
                     ))
                     return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
 
+                # Instant-TP: inverted SHORT opened already past its TP (entry ≤ TS) → the
+                # reduce-only TP limit is immediately marketable → same-candle exit (taker).
+                # (Cannot fire in wick mode: inv_entry = SP > TS.)
+                if entry_px <= ts_level:
+                    fee  = lots * face_value * fee_rate / ts_level
+                    slip = lots * face_value * slippage_pct / ts_level
+                    total_fees += fee
+                    exit_pnl = _pnl("SHORT", lots, entry_px, ts_level) - fee - slip
+                    balance += exit_pnl
+                    if balance < peak_intra_loss:
+                        peak_intra_loss = balance
+                    steps.append(CycleStep(
+                        direction="EXIT_SHORT", trigger_price=ts_level, lots=0,
+                        pnl=round(exit_pnl, 4), candle_idx=idx,
+                        timestamp=candle.timestamp,
+                    ))
+                    return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
+
         else:  # SHORT
-            # TP at TS — limit order (maker fee)
+            # TP at TS — resting limit (maker), fills at the limit price ts
             if candle.low <= ts_level:
                 fee  = lots * face_value * fee_rate_maker / ts_level
                 slip = lots * face_value * slippage_pct / ts_level
                 total_fees += fee
-                # SHORT TP: contracts × face_value × d / (SP × TS)  [exact CoinM formula]
-                exit_pnl = (lots * face_value * d / (sp * ts_level)) - fee - slip
+                # P&L from this leg's ACTUAL entry (not the d-shortcut)
+                exit_pnl = _pnl("SHORT", lots, entry_px, ts_level) - fee - slip
                 balance += exit_pnl
                 steps.append(CycleStep(
                     direction="EXIT_SHORT", trigger_price=ts_level, lots=0,
@@ -257,13 +286,13 @@ def simulate_cycle_on_candles(
             # SL at LP
             sl_trigger = candle.close >= lp if sl_mode == 'close' else candle.high >= lp
             if sl_trigger:
-                sl_fill = max(candle.open, lp) if sl_mode == 'wick' else candle.close
-                actual_c = sl_fill - sp  # real exit distance (≥ c on gap or high close)
+                # Real fill: close-mode market-fills at the candle close (overshoot past LP);
+                # wick-mode (stop-market) fills at the bracket, gap-aware.
+                sl_fill = candle.close if sl_mode == 'close' else max(candle.open, lp)
                 fee  = lots * face_value * fee_rate / sl_fill
                 slip = lots * face_value * slippage_pct / sl_fill
                 total_fees += fee
-                # SHORT SL: contracts × face_value × c / (SP × sl_fill)  [exact CoinM formula]
-                loss = -(lots * face_value * actual_c / (sp * sl_fill)) - fee - slip
+                loss = _pnl("SHORT", lots, entry_px, sl_fill) - fee - slip   # negative
                 balance += loss
                 whipsaw_count += 1
                 if balance < peak_intra_loss:
@@ -276,7 +305,8 @@ def simulate_cycle_on_candles(
                 if equity <= 0 or next_margin > equity:
                     return steps, idx, round(balance, 4), False, round(peak_intra_loss, 4), whipsaw_count, round(total_fees, 4)
 
-                # Open new LONG at sl_fill — fee in base coin
+                # Invert to LONG. Entry = REAL fill (close mode) or bracket LP (wick — unchanged).
+                inv_entry = sl_fill if sl_mode == 'close' else lp
                 open_fee  = next_lots * face_value * fee_rate / sl_fill
                 open_slip = next_lots * face_value * slippage_pct / sl_fill
                 total_fees += open_fee
@@ -291,11 +321,30 @@ def simulate_cycle_on_candles(
                 ))
                 lots = next_lots
                 direction = "LONG"
+                entry_px = inv_entry
 
                 if max_whipsaws > 0 and whipsaw_count >= max_whipsaws:
                     steps.append(CycleStep(
                         direction="STOPPED", trigger_price=lp, lots=0,
                         pnl=0.0, candle_idx=idx,
+                        timestamp=candle.timestamp,
+                    ))
+                    return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)
+
+                # Instant-TP: inverted LONG opened already past its TP (entry ≥ TL) → the
+                # reduce-only TP limit is immediately marketable → same-candle exit (taker).
+                # (Cannot fire in wick mode: inv_entry = LP < TL.)
+                if entry_px >= tl:
+                    fee  = lots * face_value * fee_rate / tl
+                    slip = lots * face_value * slippage_pct / tl
+                    total_fees += fee
+                    exit_pnl = _pnl("LONG", lots, entry_px, tl) - fee - slip
+                    balance += exit_pnl
+                    if balance < peak_intra_loss:
+                        peak_intra_loss = balance
+                    steps.append(CycleStep(
+                        direction="EXIT_LONG", trigger_price=tl, lots=0,
+                        pnl=round(exit_pnl, 4), candle_idx=idx,
                         timestamp=candle.timestamp,
                     ))
                     return steps, idx, round(balance, 4), True, round(peak_intra_loss, 4), 0, round(total_fees, 4)

@@ -103,9 +103,24 @@ def align_atr_candles(
     atr_candles: List[Candle],
     trading_idx: int,
 ) -> List[Candle]:
-    """Return ATR candles up to and including the current trading candle timestamp."""
-    ts = trading_candles[trading_idx].timestamp
-    return [c for c in atr_candles if c.timestamp <= ts]
+    """Return ATR (macro) candles that are FULLY CLOSED as of the current trading
+    candle's CLOSE — matching the live bot, whose get_ohlcv drops the currently
+    forming candle (raw[:-1]). The macro candle still forming during this trading
+    candle is excluded, removing the look-ahead from its (historically-complete)
+    full range. Decision is made at the trading candle's close, so a macro candle
+    is usable only once its own close has passed by then."""
+    # Trading candle's close time = next trading candle's open (else derive from spacing)
+    if trading_idx + 1 < len(trading_candles):
+        t_close = trading_candles[trading_idx + 1].timestamp
+    elif len(trading_candles) >= 2:
+        t_close = trading_candles[trading_idx].timestamp + (
+            trading_candles[1].timestamp - trading_candles[0].timestamp)
+    else:
+        t_close = trading_candles[trading_idx].timestamp
+    if len(atr_candles) >= 2:
+        atr_interval = atr_candles[1].timestamp - atr_candles[0].timestamp
+        return [c for c in atr_candles if c.timestamp + atr_interval <= t_close]
+    return [c for c in atr_candles if c.timestamp < t_close]
 
 
 def simulate_cycle_on_candles(

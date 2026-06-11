@@ -4,6 +4,14 @@ from typing import Optional, Tuple, List
 import statistics
 import time
 
+# ── Historical OHLCV cache ────────────────────────────────────────────────────
+# Param-tuning re-runs the same (symbol, interval, days) repeatedly; the candle
+# data is identical except the newest candle. Cache fetched klines briefly so
+# repeat backtests skip the 2–3s network fetch. In-memory only (cleared on
+# restart). TTL kept short so the latest candle stays reasonably fresh.
+_OHLCV_CACHE: dict = {}
+_OHLCV_CACHE_TTL = 300  # seconds
+
 
 def fetch_price_and_atr(
     symbol: str,
@@ -228,6 +236,14 @@ def fetch_historical_ohlcv(
 
     symbol = symbol.upper().replace("/", "").replace("-", "")
 
+    # ── cache hit? (param-tuning re-runs identical fetches) ──────────────────
+    cache_key = (symbol, interval, days, market_type)
+    cached = _OHLCV_CACHE.get(cache_key)
+    if cached and (time.time() - cached[0]) < _OHLCV_CACHE_TTL:
+        if progress_callback:
+            progress_callback(1.0)
+        return list(cached[1]), None
+
     # ms per candle
     interval_ms = {
         "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
@@ -300,6 +316,8 @@ def fetch_historical_ohlcv(
         if current_start >= end_ms:
             break
 
+    if all_klines:
+        _OHLCV_CACHE[cache_key] = (time.time(), all_klines)
     return all_klines, None
 
 

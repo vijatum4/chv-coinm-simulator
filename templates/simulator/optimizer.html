@@ -3,6 +3,7 @@
 
 {% block content %}
 <div class="page-title">Optimizer <span>Parameter Sweep</span></div>
+<div class="alert alert-red" style="margin-bottom:16px">⚠ <b>Not trustworthy — known unit bug (USD vs SOL) in the capital/margin analysis, pending fix.</b> Use the <b>Backtest</b> page for any real decision; that one is audited and correct.</div>
 
 <form method="POST" action="/sim/optimizer">
   <input type="hidden" name="action" value="optimize">

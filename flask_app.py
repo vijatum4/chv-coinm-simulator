@@ -450,8 +450,7 @@ def _prep_trade_log(result) -> list:
                 'side_cls': side_cls,   # long | short
                 'price':    f'{step.trigger_price:.4f}',
                 'lots':     int(step.lots) if step.lots else '—',
-                'pnl_usd':  step.pnl,   # USD — template converts ÷ entry_price
-                'entry_price': cycle.entry_price,
+                'pnl':      step.pnl,   # already in base coin (SOL) — engine computes natively
                 'ts':       ts,
             })
     return rows
@@ -525,12 +524,13 @@ def _save_bt_csv(result, d: dict):
             sdt = datetime.datetime.utcfromtimestamp(c.start_ts / 1000).strftime('%Y-%m-%d %H:%M') if c.start_ts else '—'
             edt = datetime.datetime.utcfromtimestamp(c.end_ts / 1000).strftime('%Y-%m-%d %H:%M') if c.end_ts else '—'
             exit_str = 'LIQ' if not c.capital_ok else getattr(c, 'exit_direction', '—')
-            w.writerow([c.cycle_num, f'${cap:,.2f}',
-                        f'+${c.net_pnl:,.2f}' if c.net_pnl >= 0 else f'-${abs(c.net_pnl):,.2f}',
+            # Capital/P&L/Worst are in BASE COIN (SOL) — no $ sign
+            w.writerow([c.cycle_num, f'{cap:,.4f}',
+                        f'+{c.net_pnl:,.4f}' if c.net_pnl >= 0 else f'-{abs(c.net_pnl):,.4f}',
                         f'{c.entry_price:.4f}', f'{c.atr_at_entry:.4f}',
                         f'{c.lp:.4f}', f'{c.sp:.4f}',
                         c.whipsaws, f'{c.duration_candles} candles',
-                        f'${c.peak_intra_loss:,.2f}', exit_str, sdt, edt])
+                        f'{c.peak_intra_loss:,.4f}', exit_str, sdt, edt])
 
 
 # ── Background backtest worker ────────────────────────────────────────────────
@@ -931,13 +931,14 @@ def bt_download_csv(job_id):
         cap += c.net_pnl
         sdt = datetime.datetime.utcfromtimestamp(c.start_ts / 1000).strftime('%Y-%m-%d %H:%M') if c.start_ts else '—'
         edt = datetime.datetime.utcfromtimestamp(c.end_ts / 1000).strftime('%Y-%m-%d %H:%M') if c.end_ts else '—'
+        # Capital/P&L/Worst are in BASE COIN (SOL) — no $ sign
         w.writerow([
-            c.cycle_num, f'${cap:,.2f}',
-            f'+${c.net_pnl:,.2f}' if c.net_pnl >= 0 else f'-${abs(c.net_pnl):,.2f}',
+            c.cycle_num, f'{cap:,.4f}',
+            f'+{c.net_pnl:,.4f}' if c.net_pnl >= 0 else f'-{abs(c.net_pnl):,.4f}',
             f'{c.entry_price:.4f}', f'{c.atr_at_entry:.4f}',
             f'{c.lp:.4f}', f'{c.sp:.4f}',
             c.whipsaws, f'{c.duration_candles} candles',
-            f'${c.peak_intra_loss:,.2f}',
+            f'{c.peak_intra_loss:,.4f}',
             getattr(c, 'exit_direction', '—'), sdt, edt,
         ])
     ts = datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')

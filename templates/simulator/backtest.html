@@ -710,7 +710,7 @@
       </thead>
       <tbody>
         {% for t in trade_log %}
-        {% set pnl_asset = t.pnl_usd / t.entry_price if t.entry_price else 0 %}
+        {% set pnl_asset = t.pnl %}
         <tr>
           <td class="col-num">{{ t.num }}</td>
           <td class="col-num" style="color:var(--beige-dim)">{{ t.cycle }}</td>

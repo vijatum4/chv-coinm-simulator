@@ -638,13 +638,14 @@ input[type=range].sf-range::-moz-range-track{
             {% endfor %}
           </select>
         </div>
-        <input type="hidden" name="atr_tf" id="atrTfHidden" value="{{ atr_tf }}">
-        <div class="sf-row" style="margin-top:-4px">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <span class="sf-field-label" style="margin:0">ATR TF</span>
-            <span id="atrTfDisplay" style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;color:var(--green);background:rgba(122,100,235,0.08);border:1px solid rgba(122,100,235,0.22);padding:2px 9px;border-radius:6px">{{ atr_tf }}</span>
-          </div>
-          <div style="font-size:10.5px;color:var(--muted);margin-top:3px">Auto-set from Trading TF</div>
+        <div class="sf-row">
+          <label class="sf-field-label">ATR TF</label>
+          <select class="sf-input" name="atr_tf" id="atrTfSelect" onchange="markAtrTfManual()">
+            {% for tf in tf_choices %}
+            <option value="{{ tf }}" {% if tf==atr_tf %}selected{% endif %}>{{ tf }}</option>
+            {% endfor %}
+          </select>
+          <div style="font-size:10.5px;color:var(--muted);margin-top:3px">Auto-set from Trading TF · change to override</div>
         </div>
 
         <div class="sf-slider-row">
@@ -923,12 +924,19 @@ function updateAssetLabels(symbolVal) {
   else lotsLbl.textContent = `Base Contracts (${base})`;
 }
 
+var _atrTfManual = false;
+
+function markAtrTfManual() {
+  _atrTfManual = true;
+}
+
 function updateAtrTf(sel) {
+  // Trading TF changed: refresh the ATR TF default unless the user has
+  // manually overridden it.
+  if (_atrTfManual) return;
   const atrTf = TF_RULE[sel.value] || '4h';
-  const hidden = document.getElementById('atrTfHidden');
-  const display = document.getElementById('atrTfDisplay');
-  if (hidden)  hidden.value = atrTf;
-  if (display) display.textContent = atrTf;
+  const select = document.getElementById('atrTfSelect');
+  if (select) select.value = atrTf;
 }
 
 function toggleSection(id, checkbox) {
@@ -969,7 +977,7 @@ function setFetchMode(mode) {
 function fetchPriceAtr() {
   const sym = document.getElementById('symbolSelect')?.value
            || document.querySelector('[name=symbol]')?.value || 'BTCUSD_PERP';
-  const atrTf = document.getElementById('atrTfHidden').value;
+  const atrTf = document.getElementById('atrTfSelect').value;
   const period = document.querySelector('[name=atr_period]').value;
   const dualOn = document.getElementById('dualAtrCheck')?.checked;
   const period2 = dualOn ? (document.getElementById('atrPeriod2Range')?.value || 0) : 0;

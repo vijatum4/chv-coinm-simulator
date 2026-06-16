@@ -150,8 +150,9 @@ def _parse_sidebar(form, sess):
         if src.get(key):
             d[key] = src[key]
 
-    # Auto-update atr_tf when trading_tf changes
-    if form.get('trading_tf'):
+    # atr_tf is now a user-selectable field. Respect the submitted value;
+    # only fall back to the auto rule when none was provided.
+    if not src.get('atr_tf') and form.get('trading_tf'):
         d['atr_tf'] = TF_RULE.get(form['trading_tf'], '4h')
 
     for key in ('atr_period', 'atr_period_2', 'leverage', 'ws_limit'):

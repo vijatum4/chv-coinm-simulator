@@ -1209,7 +1209,14 @@ function updateWSRisk(baseContracts, leverage, fv) {
   }
 
   const base = _currentBase();
-  let html = `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid var(--line);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)">
+  // Affordability colors need capital-in-USD = capital × price. Without a price
+  // (or capital) we can't rank legs, so flag it instead of silently going plain.
+  let html = '';
+  if (capitalUsd === null) {
+    const why = !hasPrice ? 'Fetch a price' : 'Enter capital';
+    html += `<div style="padding:3px 0 6px;font-size:10px;color:var(--gold)">⚠ ${why} to color legs by affordability (capital vs margin).</div>`;
+  }
+  html += `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid var(--line);font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--muted)">
     <span style="min-width:28px">WS</span>
     <span style="min-width:52px;text-align:right">Contracts</span>
     <span style="min-width:52px;text-align:right">Margin</span>
@@ -1370,6 +1377,8 @@ function updateCapitalUsd() {
     ? '$' + (usd / 1000).toFixed(1).replace(/\.0$/, '') + 'k'
     : '$' + usd.toFixed(2);
   note.textContent = '≈ ' + fmt + ' USD';
+  // Capital drives the WS-risk affordability colors — refresh the table live.
+  if (document.getElementById('fixedMarginCheck')?.checked) updateFixedMarginPreview();
 }
 
 function updateContractsNote() {

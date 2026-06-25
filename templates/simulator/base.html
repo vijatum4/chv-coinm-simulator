@@ -935,8 +935,12 @@ function updateAssetLabels(symbolVal) {
   if (capitalLbl) capitalLbl.textContent = `Capital (${base})`;
   if (!lotsLbl) return;
   const isFixed = document.getElementById('fixedMarginCheck')?.checked;
-  if (isFixed) updateFixedMarginPreview();
-  else lotsLbl.textContent = `Base Contracts (${base})`;
+  if (isFixed) {
+    updateFixedMarginPreview();
+  } else {
+    lotsLbl.textContent = `Base Contracts (${base})`;
+    updateContractsNote();   // refresh notional note with the new symbol's face value
+  }
 }
 
 var _atrTfManual = false;

@@ -798,9 +798,14 @@ input[type=range].sf-range::-moz-range-track{
           <div class="sf-row" style="margin-bottom:2px">
             <label class="sf-field-label">Coin Margin ({{ base_asset }})</label>
             <input class="sf-input mono" type="number" name="target_coin_margin" id="targetCoinInput"
-                   value="{{ target_coin_margin }}" step="0.0001" min="0.0001">
+                   value="{{ target_coin_margin }}" step="0.0001" min="0.0001"
+                   oninput="updateFixedCoinPreview()">
           </div>
           <div class="sf-caption" style="margin-top:6px;margin-bottom:6px">Contracts = coin × leverage × price ÷ face_value · <b>price-invariant headroom</b></div>
+          <div id="wsRiskTableCoin" style="display:none;margin-bottom:10px">
+            <div style="font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--muted);margin-bottom:5px">Margin per WS Level</div>
+            <div id="wsRiskRowsCoin" style="font-family:'JetBrains Mono',monospace;font-size:10.5px"></div>
+          </div>
         </div>
 
         <div class="sf-slider-row">
@@ -810,7 +815,7 @@ input[type=range].sf-range::-moz-range-track{
           </div>
           <input class="sf-range" type="range" id="leverageRange" name="leverage"
                  min="1" max="50" step="1" value="{{ leverage }}"
-                 oninput="document.getElementById('leverageBadge').textContent=this.value+'×'; if(document.getElementById('fixedMarginCheck')?.checked) updateFixedMarginPreview(); else updateContractsNote()">
+                 oninput="document.getElementById('leverageBadge').textContent=this.value+'×'; if(document.getElementById('fixedMarginCheck')?.checked) updateFixedMarginPreview(); else if(document.getElementById('fixedCoinCheck')?.checked) updateFixedCoinPreview(); else updateContractsNote()">
         </div>
 
         <div class="sf-row">
@@ -935,8 +940,11 @@ function updateAssetLabels(symbolVal) {
   if (capitalLbl) capitalLbl.textContent = `Capital (${base})`;
   if (!lotsLbl) return;
   const isFixed = document.getElementById('fixedMarginCheck')?.checked;
+  const isFixedCoin = document.getElementById('fixedCoinCheck')?.checked;
   if (isFixed) {
     updateFixedMarginPreview();
+  } else if (isFixedCoin) {
+    updateFixedCoinPreview();
   } else {
     lotsLbl.textContent = `Base Contracts (${base})`;
     updateContractsNote();   // refresh notional note with the new symbol's face value
@@ -1041,6 +1049,9 @@ function fetchPriceAtr() {
         }
         if (document.getElementById('fixedMarginCheck')?.checked) {
           updateFixedMarginPreview();
+        } else if (document.getElementById('fixedCoinCheck')?.checked) {
+          updateFixedCoinPreview();
+          updateCapitalUsd();
         } else {
           updateContractsNote();
           updateCapitalUsd();
@@ -1114,11 +1125,26 @@ function _currentBase() {
 
 function toggleFixedCoin(checkbox) {
   const section = document.getElementById('fixedCoinSection');
+  const baseLotsInput = document.getElementById('baseLotsInput');
+  const baseLotsLabel = document.getElementById('baseLotsLabel');
   if (section) section.style.display = checkbox.checked ? '' : 'none';
   // Fixed-coin and fixed-USD are mutually exclusive sizing modes.
   if (checkbox.checked) {
     const usd = document.getElementById('fixedMarginCheck');
     if (usd && usd.checked) { usd.checked = false; toggleFixedMargin(usd); }
+  }
+  if (baseLotsInput) {
+    baseLotsInput.readOnly = checkbox.checked;
+    baseLotsInput.style.opacity = checkbox.checked ? '0.38' : '';
+    baseLotsInput.style.cursor  = checkbox.checked ? 'not-allowed' : '';
+  }
+  if (checkbox.checked) {
+    updateFixedCoinPreview();
+  } else {
+    if (baseLotsLabel) baseLotsLabel.textContent = 'Base Contracts (' + _currentBase() + ')';
+    updateContractsNote();
+    const t = document.getElementById('wsRiskTableCoin');
+    if (t) t.style.display = 'none';
   }
 }
 
@@ -1164,12 +1190,52 @@ function updateFixedMarginPreview() {
     note.textContent = contracts + ' contracts × $' + fv + ' = $' + (contracts * fv).toLocaleString() + ' notional · margin $' + (contracts * fv / leverage).toFixed(2);
     note.style.display = 'block';
   }
-  updateWSRisk(contracts, leverage, fv);
+  updateWSRisk(contracts, leverage, fv, 'wsRiskTable', 'wsRiskRows');
 }
 
-function updateWSRisk(baseContracts, leverage, fv) {
-  const tableEl = document.getElementById('wsRiskTable');
-  const rowsEl  = document.getElementById('wsRiskRows');
+function updateFixedCoinPreview() {
+  // Fixed-coin: base contracts = floor(coin × leverage × price / face_value).
+  // Price-dependent, so the WS ladder needs a fetched price.
+  const coin     = parseFloat(document.getElementById('targetCoinInput')?.value);
+  const leverage = parseInt(document.getElementById('leverageRange')?.value || '10');
+  const price    = parseFloat(document.getElementById('priceInput')?.value);
+  const fv   = _faceValue();
+  const step = _lotStep();
+  const dec  = _lotDec();
+  const baseLotsInput = document.getElementById('baseLotsInput');
+  const baseLotsLabel = document.getElementById('baseLotsLabel');
+  const note    = document.getElementById('lotsUsdNote');
+  const tableEl = document.getElementById('wsRiskTableCoin');
+  if (!coin || isNaN(coin) || step <= 0) return;
+
+  if (!(price > 0) || isNaN(price)) {
+    // No price yet → can't size contracts. Flag it where the table would be.
+    if (note) {
+      note.innerHTML = '<span style="color:var(--gold)">⚠ Fetch a price — fixed-coin contracts = coin × lev × price ÷ face_value.</span>';
+      note.style.display = 'block';
+    }
+    if (baseLotsInput) baseLotsInput.value = '';
+    if (tableEl) tableEl.style.display = 'none';
+    return;
+  }
+
+  const contracts = Math.floor(coin * leverage * price / fv / step) * step;
+  if (baseLotsInput) baseLotsInput.value = contracts.toFixed(dec);
+  if (baseLotsLabel) baseLotsLabel.textContent = 'Base Contracts (' + _currentBase() + ')';
+  if (note) {
+    const marginUsd  = contracts * fv / leverage;
+    const marginCoin = marginUsd / price;
+    note.textContent = contracts + ' contracts × $' + fv + ' = $' + (contracts * fv).toLocaleString()
+                     + ' notional · margin ' + marginCoin.toFixed(4) + ' ' + _currentBase()
+                     + ' ($' + marginUsd.toFixed(2) + ')';
+    note.style.display = 'block';
+  }
+  updateWSRisk(contracts, leverage, fv, 'wsRiskTableCoin', 'wsRiskRowsCoin');
+}
+
+function updateWSRisk(baseContracts, leverage, fv, tableId, rowsId) {
+  const tableEl = document.getElementById(tableId || 'wsRiskTable');
+  const rowsEl  = document.getElementById(rowsId || 'wsRiskRows');
   if (!tableEl || !rowsEl) return;
   if (!baseContracts || baseContracts <= 0) { tableEl.style.display = 'none'; return; }
 
@@ -1241,6 +1307,8 @@ function updateWSRisk(baseContracts, leverage, fv) {
 (function() {
   var chk = document.getElementById('fixedMarginCheck');
   if (chk && chk.checked) toggleFixedMargin(chk);
+  var coinChk = document.getElementById('fixedCoinCheck');
+  if (coinChk && coinChk.checked) toggleFixedCoin(coinChk);
 })();
 
 function autoFetchSymbol(sel) {
@@ -1379,6 +1447,7 @@ function updateCapitalUsd() {
   note.textContent = '≈ ' + fmt + ' USD';
   // Capital drives the WS-risk affordability colors — refresh the table live.
   if (document.getElementById('fixedMarginCheck')?.checked) updateFixedMarginPreview();
+  else if (document.getElementById('fixedCoinCheck')?.checked) updateFixedCoinPreview();
 }
 
 function updateContractsNote() {

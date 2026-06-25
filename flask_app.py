@@ -133,6 +133,8 @@ def _sidebar_defaults():
         min_notional_on=False,
         fixed_margin_on=False,
         target_margin=50.0,
+        fixed_coin_on=False,
+        target_coin_margin=50.0,
         sl_mode='wick',
     )
 
@@ -162,7 +164,7 @@ def _parse_sidebar(form, sess):
             pass
 
     for key in ('price_val', 'atr_val', 'efficiency_buffer', 'reward_ratio',
-                'base_lots', 'capital', 'fee_rate_pct', 'maker_fee_pct', 'atr_guard_multiplier', 'target_margin'):
+                'base_lots', 'capital', 'fee_rate_pct', 'maker_fee_pct', 'atr_guard_multiplier', 'target_margin', 'target_coin_margin'):
         try:
             d[key] = float(src[key])
         except (KeyError, TypeError, ValueError):
@@ -172,7 +174,7 @@ def _parse_sidebar(form, sess):
     if 'capital' not in form and 'capital' not in sess:
         d['capital'] = 0.01
 
-    for key in ('ws_limit_on', 'atr_guard_on', 'use_live', 'dual_atr_on', 'min_notional_on', 'fixed_margin_on'):
+    for key in ('ws_limit_on', 'atr_guard_on', 'use_live', 'dual_atr_on', 'min_notional_on', 'fixed_margin_on', 'fixed_coin_on'):
         # When a form is submitted, absent checkbox = explicitly unchecked.
         # Only fall back to session on GET (form is empty {}).
         val = form.get(key, '') if form else src.get(key, '')
@@ -598,6 +600,7 @@ def _bt_worker(job_id: str):
             atr_guard_multiplier=d.get('atr_guard_multiplier', 1.0),
             min_notional_on=bool(d.get('min_notional_on', False)),
             fixed_margin=float(d['target_margin']) if d.get('fixed_margin_on') else 0.0,
+            fixed_coin_margin=float(d['target_coin_margin']) if d.get('fixed_coin_on') else 0.0,
             lot_step=LOT_SPECS.get(d.get('symbol', ''), (1, 1, 0))[1],
             sl_mode=d.get('sl_mode', 'wick'),
             face_value=face_value,

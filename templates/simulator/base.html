@@ -788,6 +788,21 @@ input[type=range].sf-range::-moz-range-track{
           </div>
         </div>
 
+        <label class="sf-toggle" style="margin-bottom:10px;margin-top:8px">
+          <input type="checkbox" name="fixed_coin_on" id="fixedCoinCheck"
+                 {% if fixed_coin_on %}checked{% endif %}
+                 onchange="toggleFixedCoin(this)">
+          <span class="sf-toggle-lbl">Fixed Coin Margin per Cycle</span>
+        </label>
+        <div id="fixedCoinSection" {% if not fixed_coin_on %}style="display:none"{% endif %}>
+          <div class="sf-row" style="margin-bottom:2px">
+            <label class="sf-field-label">Coin Margin ({{ base_asset }})</label>
+            <input class="sf-input mono" type="number" name="target_coin_margin" id="targetCoinInput"
+                   value="{{ target_coin_margin }}" step="0.0001" min="0.0001">
+          </div>
+          <div class="sf-caption" style="margin-top:6px;margin-bottom:6px">Contracts = coin × leverage × price ÷ face_value · <b>price-invariant headroom</b></div>
+        </div>
+
         <div class="sf-slider-row">
           <div class="sf-slider-head">
             <label class="sf-slider-lbl" for="leverageRange">Leverage</label>
@@ -1093,10 +1108,24 @@ function _currentBase() {
   return sym.replace('USD_PERP','').replace('USDT','').replace('BUSD','') || '{{ base_asset }}';
 }
 
+function toggleFixedCoin(checkbox) {
+  const section = document.getElementById('fixedCoinSection');
+  if (section) section.style.display = checkbox.checked ? '' : 'none';
+  // Fixed-coin and fixed-USD are mutually exclusive sizing modes.
+  if (checkbox.checked) {
+    const usd = document.getElementById('fixedMarginCheck');
+    if (usd && usd.checked) { usd.checked = false; toggleFixedMargin(usd); }
+  }
+}
+
 function toggleFixedMargin(checkbox) {
   const section = document.getElementById('fixedMarginSection');
   const baseLotsInput = document.getElementById('baseLotsInput');
   const baseLotsLabel = document.getElementById('baseLotsLabel');
+  if (checkbox.checked) {
+    const coin = document.getElementById('fixedCoinCheck');
+    if (coin && coin.checked) { coin.checked = false; toggleFixedCoin(coin); }
+  }
   if (section) section.style.display = checkbox.checked ? '' : 'none';
   if (baseLotsInput) {
     baseLotsInput.readOnly = checkbox.checked;

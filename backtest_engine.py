@@ -386,6 +386,7 @@ def run_backtest(
     atr_guard_multiplier: float = 1.0,
     min_notional_on: bool = False,
     fixed_margin: float = 0.0,
+    fixed_coin_margin: float = 0.0,   # base-coin margin per cycle (price-scaled contracts)
     lot_step: float = 1.0,        # CoinM: integer contracts, so default step = 1
     dual_atr_mode: str = 'min',
     sl_mode: str = 'wick',
@@ -431,8 +432,18 @@ def run_backtest(
         entry_price = trading_candles[i].close
         params = calculate_params(symbol, entry_price, atr_val, buffer, reward_ratio, atr_guard_multiplier)
 
-        # Fixed-margin mode: CoinM margin = contracts × face_value / leverage (price-independent)
-        if fixed_margin > 0 and lot_step > 0:
+        # Sizing mode (precedence: fixed-coin > fixed-USD > base lots)
+        if fixed_coin_margin > 0 and lot_step > 0:
+            # Fixed base-coin margin: commit a constant amount of the coin each
+            # cycle. SUI margin = contracts × face / (lev × price), so to hold it
+            # constant the contract count scales WITH price.
+            raw = fixed_coin_margin * leverage * entry_price / face_value / lot_step
+            cycle_lots = round(math.floor(raw) * lot_step, 8)
+            if cycle_lots <= 0:
+                i += 1
+                continue
+        elif fixed_margin > 0 and lot_step > 0:
+            # Fixed USD margin: CoinM margin = contracts × face / leverage (price-independent)
             raw = fixed_margin * leverage / face_value / lot_step
             cycle_lots = round(math.floor(raw) * lot_step, 8)
             if cycle_lots <= 0:
